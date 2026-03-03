@@ -1,0 +1,22 @@
+TICKERS_COL = [
+    "ECOPETROL.CL",
+    "ISA.CL",
+    "PFBCOLOM.CL",
+    "BCOLOMBIA.CL",
+    "PFDAVVNDA.CL",
+    "GRUPOARGOS.CL",
+    "GRUPOSURA.CL",
+    "CEMARGOS.CL",
+    "NUTRESA.CL",
+    "GEB.CL",
+    "ETB.CL",
+    "EXITO.CL",
+    "PROMIGAS.CL",
+    "PFGRUPSURA.CL",
+    "PFAVAL.CL",
+    "AVAL.CL",
+    "BVC.CL",
+    "CELSIA.CL",
+    "ENKA.CL",
+    "MINEROS.CL"
+]
