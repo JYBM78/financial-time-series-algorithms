@@ -205,3 +205,32 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# Project-specific ignore rules (added by team)
+# Datos y resultados (no versionar CSVs ni outputs)
+data/
+results/
+data/example/
+
+# Extensiones de salida
+*.csv
+*.png
+*.jpg
+*.jpeg
+
+# Entornos virtuales
+.venv/
+venv/
+env/
+
+# Python cache / bytecode
+__pycache__/
+*.py[cod]
+
+# Jupyter
+.ipynb_checkpoints
+
+# IDEs
+.vscode/
+.idea/
+.DS_Store
