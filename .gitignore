@@ -209,6 +209,7 @@ __marimo__/
 # Project-specific ignore rules (added by team)
 # Datos y resultados (no versionar CSVs ni outputs)
 data/
+reports/
 results/
 data/example/
 

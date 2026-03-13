@@ -4,6 +4,7 @@ Genera una tabla CSV con tiempos medios por algoritmo y tamaño, y guarda gráfi
 de barras ascendentes para el mayor tamaño probado.
 """
 import os
+import sys
 import time
 import statistics
 import random
@@ -11,6 +12,12 @@ from pathlib import Path
 
 import pandas as pd
 import matplotlib.pyplot as plt
+
+# --- INICIO DE LA CORRECCIÓN DE IMPORTACIÓN ---
+# Añadir el directorio raíz del proyecto a sys.path para encontrar 'src'
+project_root_for_import = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(project_root_for_import))
+# --- FIN DE LA CORRECCIÓN DE IMPORTACIÓN ---
 
 from src.algorithms.sorting import ALGORITHMS
 
@@ -29,7 +36,8 @@ def measure_time(func, arr, repeats=3):
 def main():
     project_root = Path(__file__).resolve().parents[1]
     data_path = project_root / "data" / "processed" / "precios_unificados.csv"
-    results_dir = project_root / "results"
+    # Corrección: Usar el directorio 'reports' que ya existe en el proyecto
+    results_dir = project_root / "reports"
     results_dir.mkdir(parents=True, exist_ok=True)
 
     if not data_path.exists():
@@ -37,18 +45,17 @@ def main():
         return
 
     print(f"Cargando datos desde {data_path} ...")
-    # El CSV unificado se guardó con separador ';'
-    df = pd.read_csv(data_path, index_col=0, parse_dates=True, sep=';')
+    # Corrección: El CSV unificado se guarda con separador ',' y sin índice
+    df = pd.read_csv(data_path, parse_dates=['Date'], sep=',')
 
     if df.empty:
         print("El dataset unificado está vacío.")
         return
 
-    # Construir arreglo base de enteros a partir del primer ticker Close (en centavos)
-    first_col = df.columns[0]
-    series = df[first_col].dropna()
+    # Corrección: Usar la columna 'Close' explícitamente para el benchmark
+    series = df['Close'].dropna()
     if series.empty:
-        print(f"La columna {first_col} no contiene datos.")
+        print("La columna 'Close' no contiene datos o está vacía después de eliminar NaNs.")
         return
 
     # Convertir precios a enteros (centavos) para benchmarking
@@ -79,13 +86,17 @@ def main():
 
         for name, func in ALGORITHMS.items():
             print(f"Midiendo {name} (n={size}) ...")
-            avg, std = measure_time(func, arr, repeats=3)
-            records.append({
-                'algorithm': name,
-                'size': size,
-                'avg_time_sec': avg,
-                'std_time_sec': std,
-            })
+            try:
+                avg, std = measure_time(func, arr, repeats=3)
+                records.append({
+                    'algorithm': name,
+                    'size': size,
+                    'avg_time_sec': avg,
+                    'std_time_sec': std,
+                })
+            except Exception as e:
+                print(f"  -> ERROR al ejecutar {name}: {e}")
+
 
     # Guardar CSV con resultados
     results_df = pd.DataFrame.from_records(records)
@@ -94,19 +105,22 @@ def main():
     print(f"Resultados guardados en {csv_path}")
 
     # Generar gráfico para el mayor tamaño probado
-    max_size = max(results_df['size'].unique())
-    df_max = results_df[results_df['size'] == max_size].copy()
-    df_max = df_max.sort_values('avg_time_sec')
+    if 'size' in results_df and not results_df.empty:
+        max_size = max(results_df['size'].unique())
+        df_max = results_df[results_df['size'] == max_size].copy()
+        df_max = df_max.sort_values('avg_time_sec')
 
-    plt.figure(figsize=(10, 6))
-    plt.bar(df_max['algorithm'], df_max['avg_time_sec'])
-    plt.xticks(rotation=45, ha='right')
-    plt.ylabel('Tiempo medio (s)')
-    plt.title(f'Comparación de tiempos de ordenamiento (n={max_size})')
-    plt.tight_layout()
-    png_path = results_dir / f'sorting_benchmark_n{max_size}.png'
-    plt.savefig(png_path)
-    print(f"Gráfico guardado en {png_path}")
+        plt.figure(figsize=(10, 6))
+        plt.bar(df_max['algorithm'], df_max['avg_time_sec'])
+        plt.xticks(rotation=45, ha='right')
+        plt.ylabel('Tiempo medio (s)')
+        plt.title(f'Comparación de tiempos de ordenamiento (n={max_size})')
+        plt.tight_layout()
+        png_path = results_dir / f'sorting_benchmark_n{max_size}.png'
+        plt.savefig(png_path)
+        print(f"Gráfico guardado en {png_path}")
+    else:
+        print("No se generaron resultados de benchmark, no se puede crear el gráfico.")
 
 
 if __name__ == '__main__':

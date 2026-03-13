@@ -1,8 +1,7 @@
 TICKERS_COL = [
     "ECOPETROL.CL",
     "ISA.CL",
-    "PFBCOLOM.CL",
-    "BCOLOMBIA.CL",
+    "CIB",
     "PFDAVVNDA.CL",
     "GRUPOARGOS.CL",
     "GRUPOSURA.CL",
@@ -13,10 +12,11 @@ TICKERS_COL = [
     "EXITO.CL",
     "PROMIGAS.CL",
     "PFGRUPSURA.CL",
-    "PFAVAL.CL",
-    "AVAL.CL",
+    "AVAL",
     "BVC.CL",
     "CELSIA.CL",
     "ENKA.CL",
-    "MINEROS.CL"
+    "MINEROS.CL",
+    "TERPEL.CL",
+    "GPRK"
 ]
