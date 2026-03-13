@@ -39,36 +39,74 @@ def descargar_historico(ticker, fecha_inicio, fecha_fin, guardar=True, carpeta="
         'Referer': 'https://finance.yahoo.com/'
     }
 
-    # Agregar delay aleatorio antes de la petición
+    # Reintentos con exponential backoff y jitter
+    # Sleep inicial antes de la primera petición para mitigar rate limiting
     time.sleep(random.uniform(1, 3))
 
-    try:
-        response = requests.get(url, params=params, headers=headers, timeout=10)
+    max_retries = 3
+    backoff_base = 2
+    last_error = None
 
-        # Manejo de errores HTTP
-        if response.status_code == 429:
-            print(f"Rate limit alcanzado. Esperando 60 segundos...")
-            time.sleep(60)
-            # Reintentar una vez
+    for attempt in range(1, max_retries + 1):
+        try:
             response = requests.get(url, params=params, headers=headers, timeout=10)
 
-        if response.status_code != 200:
-            print(f"Error: API request failed with status code {response.status_code}")
-            print(f"Response text: {response.text[:500]}")
-            return pd.DataFrame()
+            # Manejo de errores HTTP
+            if response.status_code == 200:
+                try:
+                    data = response.json()
+                except ValueError as e:
+                    last_error = f"JSON decode error: {e}"
+                    # no retry for invalid JSON
+                    break
+                else:
+                    # éxito
+                    break
 
-        data = response.json()
+            # Si es 404 -> no existe el ticker (fallo definitivo)
+            if response.status_code == 404:
+                last_error = f"404 Not Found"
+                data = None
+                break
 
-    except requests.exceptions.JSONDecodeError as e:
-        print(f"Error decoding JSON response: {e}")
-        print(f"Response text: {response.text[:500]}")
-        return pd.DataFrame()
-    except requests.exceptions.Timeout:
-        print(f"Request timeout for {ticker}")
-        return pd.DataFrame()
-    except requests.exceptions.RequestException as e:
-        print(f"Request error: {e}")
-        return pd.DataFrame()
+            # Si es rate limit, reintentar con backoff
+            if response.status_code == 429:
+                last_error = f"429 Rate limit"
+                sleep_time = backoff_base ** attempt + random.uniform(0, 1)
+                print(f"Rate limit alcanzado para {ticker}. Esperando {sleep_time:.1f}s antes de reintentar (intento {attempt})")
+                time.sleep(sleep_time)
+                continue
+
+            # Otros códigos de error -> intentar reintentar
+            last_error = f"HTTP {response.status_code}"
+            sleep_time = backoff_base ** attempt + random.uniform(0, 1)
+            print(f"HTTP {response.status_code} para {ticker}. Reintentando en {sleep_time:.1f}s (intento {attempt})")
+            time.sleep(sleep_time)
+            continue
+
+        except requests.exceptions.Timeout:
+            last_error = "timeout"
+            sleep_time = backoff_base ** attempt + random.uniform(0, 1)
+            print(f"Timeout para {ticker}. Reintentando en {sleep_time:.1f}s (intento {attempt})")
+            time.sleep(sleep_time)
+            continue
+        except requests.exceptions.RequestException as e:
+            last_error = str(e)
+            sleep_time = backoff_base ** attempt + random.uniform(0, 1)
+            print(f"Request error para {ticker}: {e}. Reintentando en {sleep_time:.1f}s (intento {attempt})")
+            time.sleep(sleep_time)
+            continue
+
+    else:
+        # Si agotamos los reintentos
+        print(f"Error: No se pudo descargar {ticker} después de {max_retries} intentos. Último error: {last_error}")
+        return pd.DataFrame(), last_error
+
+    # Si aquí data es None o no trae estructura válida
+    if data is None or 'chart' not in data or 'result' not in data['chart'] or not data['chart']['result']:
+        reason = last_error or 'Unexpected API response structure'
+        print(f"Error: Unexpected API response structure for ticker {ticker}: {reason}")
+        return pd.DataFrame(), reason
 
     # Validar estructura de respuesta
     if 'chart' not in data or 'result' not in data['chart'] or not data['chart']['result']:
@@ -116,22 +154,42 @@ def descargar_historico(ticker, fecha_inicio, fecha_fin, guardar=True, carpeta="
         print(f"Ubicación completa: {os.path.abspath(ruta_completa)}")
     # ============================================================
 
-    return df
+    return df, None
 
 
 def descargar_todos():
 
     fecha_fin = dt.datetime.today()
     fecha_inicio = fecha_fin - dt.timedelta(days=5*365)
+    failed = []
 
     for ticker in TICKERS_COL:
-
         print(f"Descargando {ticker}...")
 
-        descargar_historico(
+        df, error = descargar_historico(
             ticker,
             fecha_inicio,
             fecha_fin,
             guardar=True,
             carpeta="data/raw"
         )
+
+        if df is None or (isinstance(df, pd.DataFrame) and df.empty):
+            # Registrar fallo
+            reason = error or 'empty dataframe'
+            failed.append((ticker, reason))
+
+    # Guardar reporte de fallos
+    if failed:
+        os.makedirs('data', exist_ok=True)
+        fail_path = os.path.join('data', 'failures.txt')
+        with open(fail_path, 'w', encoding='utf-8') as f:
+            for t, r in failed:
+                f.write(f"{t};{r}\n")
+        print(f"Se registraron fallos en la descarga. Ver {fail_path}")
+    else:
+        # eliminar archivo de fallos si existía
+        try:
+            os.remove(os.path.join('data', 'failures.txt'))
+        except OSError:
+            pass
