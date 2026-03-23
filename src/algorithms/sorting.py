@@ -9,7 +9,9 @@ están simplificadas pero funcionales para propósitos de benchmarking y enseña
 """
 from typing import List
 
-
+# =========================================================
+# 🔹 1. SELECTION SORT (Inicio)
+# =========================================================
 def selection_sort(arr: List[int]) -> List[int]:
     a = arr.copy()
     n = len(a)
@@ -20,8 +22,14 @@ def selection_sort(arr: List[int]) -> List[int]:
                 min_idx = j
         a[i], a[min_idx] = a[min_idx], a[i]
     return a
+# =========================================================
+# 🔹 1. SELECTION SORT (Fin)
+# =========================================================
 
 
+# =========================================================
+# 🔹 2. BINARY INSERTION SORT (Inicio)
+# =========================================================
 def binary_insertion_sort(arr: List[int]) -> List[int]:
     a = []
     for x in arr:
@@ -34,8 +42,14 @@ def binary_insertion_sort(arr: List[int]) -> List[int]:
                 hi = mid
         a.insert(lo, x)
     return a
+# =========================================================
+# 🔹 2. BINARY INSERTION SORT (Fin)
+# =========================================================
 
 
+# =========================================================
+# 🔹 3. GNOME SORT (Inicio)
+# =========================================================
 def gnome_sort(arr: List[int]) -> List[int]:
     a = arr.copy()
     i = 1
@@ -47,8 +61,14 @@ def gnome_sort(arr: List[int]) -> List[int]:
             if i > 1:
                 i -= 1
     return a
+# =========================================================
+# 🔹 3. GNOME SORT (Fin)
+# =========================================================
 
 
+# =========================================================
+# 🔹 4. COMB SORT (Inicio)
+# =========================================================
 def comb_sort(arr: List[int]) -> List[int]:
     a = arr.copy()
     n = len(a)
@@ -67,8 +87,14 @@ def comb_sort(arr: List[int]) -> List[int]:
                 sorted_flag = False
             i += 1
     return a
+# =========================================================
+# 🔹 4. COMB SORT (Fin)
+# =========================================================
 
 
+# =========================================================
+# 🔹 5. QUICK SORT (Inicio)
+# =========================================================
 def quick_sort(arr: List[int]) -> List[int]:
     if len(arr) <= 1:
         return arr.copy()
@@ -77,21 +103,63 @@ def quick_sort(arr: List[int]) -> List[int]:
     middle = [x for x in arr if x == pivot]
     right = [x for x in arr if x > pivot]
     return quick_sort(left) + middle + quick_sort(right)
+# =========================================================
+# 🔹 5. QUICK SORT (Fin)
+# =========================================================
 
 
+# =========================================================
+# 🔹 6. HEAP SORT (Inicio)
+# =========================================================
 def heap_sort(arr: List[int]) -> List[int]:
     a = arr.copy()
-    import heapq
-    heapq.heapify(a)
-    return [heapq.heappop(a) for _ in range(len(a))]
+    n = len(a)
+
+    # Construir el heap (max-heap)
+    for i in range(n // 2 - 1, -1, -1):
+        heapify(a, n, i)
+
+    # Extraer elementos uno por uno
+    for i in range(n - 1, 0, -1):
+        # Mover la raíz (máximo) al final
+        a[i], a[0] = a[0], a[i]
+
+        # Volver a ajustar el heap
+        heapify(a, i, 0)
+
+    return a
 
 
+def heapify(a: List[int], n: int, i: int):
+    largest = i
+    left = 2 * i + 1
+    right = 2 * i + 2
+
+    # Si el hijo izquierdo es mayor
+    if left < n and a[left] > a[largest]:
+        largest = left
+
+    # Si el hijo derecho es mayor
+    if right < n and a[right] > a[largest]:
+        largest = right
+
+    # Si el mayor no es la raíz
+    if largest != i:
+        a[i], a[largest] = a[largest], a[i]
+        heapify(a, n, largest)
+# =========================================================
+# 🔹 6. HEAP SORT (Fin)
+# =========================================================
+
+
+# =========================================================
+# 🔹 7. TREE SORT (Inicio)
+# =========================================================
 class _BSTNode:
     def __init__(self, val):
         self.val = val
         self.left = None
         self.right = None
-
 
 def _bst_insert(root, val):
     if root is None:
@@ -102,14 +170,12 @@ def _bst_insert(root, val):
         root.right = _bst_insert(root.right, val)
     return root
 
-
 def _bst_inorder(root, out):
     if root is None:
         return
     _bst_inorder(root.left, out)
     out.append(root.val)
     _bst_inorder(root.right, out)
-
 
 def tree_sort(arr: List[int]) -> List[int]:
     root = None
@@ -118,8 +184,14 @@ def tree_sort(arr: List[int]) -> List[int]:
     out = []
     _bst_inorder(root, out)
     return out
+# =========================================================
+# 🔹 7. TREE SORT (Fin)
+# =========================================================
 
 
+# =========================================================
+# 🔹 8. PIGEONHOLE SORT (Inicio)
+# =========================================================
 def pigeonhole_sort(arr: List[int]) -> List[int]:
     if not arr:
         return []
@@ -133,29 +205,80 @@ def pigeonhole_sort(arr: List[int]) -> List[int]:
     for i in range(size):
         out.extend([i + min_val] * holes[i])
     return out
+# =========================================================
+# 🔹 8. PIGEONHOLE SORT (Fin)
+# =========================================================
+
+
+# =========================================================
+# 🔹 9. BUCKET SORT (Inicio)
+# =========================================================
+def insertion_sort(arr: List[int]) -> List[int]:
+    a = []
+    for x in arr:
+        a.append(x)
+
+    for i in range(1, len(a)):
+        key = a[i]
+        j = i - 1
+        while j >= 0 and a[j] > key:
+            a[j + 1] = a[j]
+            j -= 1
+        a[j + 1] = key
+
+    return a
 
 
 def bucket_sort(arr: List[int], bucket_size: int = 1000) -> List[int]:
-    if not arr:
+    if len(arr) == 0:
         return []
-    min_val, max_val = min(arr), max(arr)
-    bucket_count = (max_val - min_val) // bucket_size + 1
-    buckets = [[] for _ in range(bucket_count)]
+
+    # Copia manual
+    a = []
     for x in arr:
+        a.append(x)
+
+    # Min y max manual
+    min_val = a[0]
+    max_val = a[0]
+    for x in a:
+        if x < min_val:
+            min_val = x
+        if x > max_val:
+            max_val = x
+
+    # Crear buckets manualmente
+    bucket_count = (max_val - min_val) // bucket_size + 1
+    buckets = []
+    for _ in range(bucket_count):
+        buckets.append([])
+
+    # Distribución
+    for x in a:
         idx = (x - min_val) // bucket_size
         buckets[idx].append(x)
+
+    # Ordenar y unir manualmente
     out = []
     for b in buckets:
-        out.extend(sorted(b))  # small sorts inside buckets allowed
+        if len(b) > 0:
+            sorted_bucket = insertion_sort(b)
+            for val in sorted_bucket:
+                out.append(val)
+
     return out
+# =========================================================
+# 🔹 9. BUCKET SORT (Fin)
+# =========================================================
 
 
+# =========================================================
+# 🔹 10. RADIX SORT (Inicio)
+# =========================================================
 def radix_sort(arr: List[int]) -> List[int]:
-    # sorts non-negative integers
     if not arr:
         return []
     if any(x < 0 for x in arr):
-        # naive handling: offset values to be non-negative
         offset = -min(arr)
         arr = [x + offset for x in arr]
     else:
@@ -176,8 +299,14 @@ def radix_sort(arr: List[int]) -> List[int]:
     if offset:
         a = [x - offset for x in a]
     return a
+# =========================================================
+# 🔹 10. RADIX SORT (Fin)
+# =========================================================
 
 
+# =========================================================
+# 🔹 11. BITONIC SORT (Inicio)
+# =========================================================
 def _bitonic_merge(a, low, cnt, direction):
     if cnt > 1:
         k = cnt // 2
@@ -187,7 +316,6 @@ def _bitonic_merge(a, low, cnt, direction):
         _bitonic_merge(a, low, k, direction)
         _bitonic_merge(a, low + k, k, direction)
 
-
 def _bitonic_sort(a, low, cnt, direction):
     if cnt > 1:
         k = cnt // 2
@@ -195,9 +323,7 @@ def _bitonic_sort(a, low, cnt, direction):
         _bitonic_sort(a, low + k, k, 0)
         _bitonic_merge(a, low, cnt, direction)
 
-
 def bitonic_sort(arr: List[int]) -> List[int]:
-    # bitonic sort requires length to be a power of two; pad with large values
     a = arr.copy()
     n = len(a)
     if n == 0:
@@ -209,10 +335,15 @@ def bitonic_sort(arr: List[int]) -> List[int]:
     a.extend([pad_value] * (pow2 - n))
     _bitonic_sort(a, 0, pow2, 1)
     return [x for x in a if x != pad_value][:n]
+# =========================================================
+# 🔹 11. BITONIC SORT (Fin)
+# =========================================================
 
 
+# =========================================================
+# 🔹 12. TIM SORT (Inicio)
+# =========================================================
 def tim_sort(arr: List[int]) -> List[int]:
-    # Simplified TimSort-like: split into runs and merge
     MIN_RUN = 32
 
     def insertion_sort(sub):
@@ -248,7 +379,6 @@ def tim_sort(arr: List[int]) -> List[int]:
         runs.append(run)
         i = j
 
-    # merge runs
     while len(runs) > 1:
         new_runs = []
         for k in range(0, len(runs), 2):
@@ -257,7 +387,11 @@ def tim_sort(arr: List[int]) -> List[int]:
             else:
                 new_runs.append(runs[k])
         runs = new_runs
+
     return runs[0] if runs else []
+# =========================================================
+# 🔹 12. TIM SORT (Fin)
+# =========================================================
 
 
 # Registry of algorithms for easy access
