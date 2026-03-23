@@ -1,5 +1,5 @@
 import pandas as pd
-import glob
+import glob #Sirve para buscar archivos que coincidan con un patrón.
 import os
 
 def cargar_datos():
@@ -45,7 +45,7 @@ def limpiar_dataframe(df):
     df = df.sort_index()
 
     # eliminar duplicados
-    df = df[~df.index.duplicated()]
+    df = df.groupby(df.index).last()
 
     # interpolar valores faltantes
     df = df.interpolate(method="linear")
