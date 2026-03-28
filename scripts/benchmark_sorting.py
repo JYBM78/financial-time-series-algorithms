@@ -124,7 +124,7 @@ def main():
                 va='bottom'
             )
 
-        plt.yscale('log')  # 👈 clave para tu problema
+        plt.yscale('log')
         plt.xticks(rotation=45, ha='right')
         plt.ylabel('Tiempo medio (s)')
         plt.title(f'Comparación de tiempos de ordenamiento (n={max_size})')
