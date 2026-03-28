@@ -3,6 +3,7 @@
 Genera una tabla CSV con tiempos medios por algoritmo y tamaño, y guarda gráficos
 de barras ascendentes para el mayor tamaño probado.
 """
+from src.algorithms.sorting import ALGORITHMS
 import os
 import sys
 import time
@@ -18,8 +19,6 @@ import matplotlib.pyplot as plt
 project_root_for_import = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(project_root_for_import))
 # --- FIN DE LA CORRECCIÓN DE IMPORTACIÓN ---
-
-from src.algorithms.sorting import ALGORITHMS
 
 
 def measure_time(func, arr, repeats=3):
@@ -41,7 +40,8 @@ def main():
     results_dir.mkdir(parents=True, exist_ok=True)
 
     if not data_path.exists():
-        print(f"Archivo unificado no encontrado en {data_path}. Ejecuta el ETL primero.")
+        print(
+            f"Archivo unificado no encontrado en {data_path}. Ejecuta el ETL primero.")
         return
 
     print(f"Cargando datos desde {data_path} ...")
@@ -68,7 +68,7 @@ def main():
     print(f"Longitud de la serie base: {max_len}")
 
     # Tamaños a probar (ajustar según disponibilidad)
-    candidate_sizes = [100, 1000, 5000, 10000]
+    candidate_sizes = [100, 1000, 5000, 10000, 20000]
     sizes = [s for s in candidate_sizes if s <= max_len]
     if not sizes:
         sizes = [max_len]
@@ -97,7 +97,6 @@ def main():
             except Exception as e:
                 print(f"  -> ERROR al ejecutar {name}: {e}")
 
-
     # Guardar CSV con resultados
     results_df = pd.DataFrame.from_records(records)
     csv_path = results_dir / 'sorting_benchmark.csv'
@@ -111,7 +110,26 @@ def main():
         df_max = df_max.sort_values('avg_time_sec')
 
         plt.figure(figsize=(10, 6))
-        plt.bar(df_max['algorithm'], df_max['avg_time_sec'])
+        plt.figure(figsize=(10, 6))
+
+        bars = plt.bar(df_max['algorithm'], df_max['avg_time_sec'])
+
+        for bar in bars:
+            height = bar.get_height()
+            plt.text(
+                bar.get_x() + bar.get_width() / 2,
+                height,
+                f"{height:.2e}",
+                ha='center',
+                va='bottom'
+            )
+
+        plt.yscale('log')  # 👈 clave para tu problema
+        plt.xticks(rotation=45, ha='right')
+        plt.ylabel('Tiempo medio (s)')
+        plt.title(f'Comparación de tiempos de ordenamiento (n={max_size})')
+
+        plt.yscale('log')
         plt.xticks(rotation=45, ha='right')
         plt.ylabel('Tiempo medio (s)')
         plt.title(f'Comparación de tiempos de ordenamiento (n={max_size})')
