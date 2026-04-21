@@ -1,0 +1,561 @@
+"""
+Multiplicación de Matrices Grandes - Seguimiento 2
+Universidad del Quindío - Ingeniería de Sistemas y Computación
+Implementación de 15 algoritmos con medición de tiempo de ejecución
+"""
+
+import numpy as np
+import time
+import json
+import os
+import math
+from concurrent.futures import ThreadPoolExecutor
+import threading
+
+# ─────────────────────────────────────────────────
+# GENERACIÓN Y PERSISTENCIA DE CASOS DE PRUEBA
+# ─────────────────────────────────────────────────
+
+def generar_matriz(n, seed=None):
+    """Genera matriz n×n con números de mínimo 6 dígitos (100000–999999)."""
+    rng = np.random.default_rng(seed)
+    return rng.integers(100_000, 1_000_000, size=(n, n), dtype=np.int64)
+
+def guardar_caso(nombre, A, B):
+    path = f"casos/{nombre}"
+    os.makedirs(path, exist_ok=True)
+    np.save(f"{path}/A.npy", A)
+    np.save(f"{path}/B.npy", B)
+    print(f"  Caso guardado: {path}  ({A.shape[0]}×{A.shape[0]})")
+
+def cargar_caso(nombre):
+    path = f"casos/{nombre}"
+    A = np.load(f"{path}/A.npy")
+    B = np.load(f"{path}/B.npy")
+    return A, B
+
+def preparar_casos(n1, n2):
+    """
+    Prepara 2 casos de prueba. n debe ser factor de 2^k (requerimiento).
+    Caso 1: n1×n1   Caso 2: n2×n2
+    """
+    os.makedirs("casos", exist_ok=True)
+    for nombre, n, seed in [("caso1", n1, 42), ("caso2", n2, 99)]:
+        path = f"casos/{nombre}"
+        if not os.path.exists(f"{path}/A.npy"):
+            print(f"  Generando {nombre} ({n}×{n})...")
+            A = generar_matriz(n, seed)
+            B = generar_matriz(n, seed + 1)
+            guardar_caso(nombre, A, B)
+        else:
+            print(f"  {nombre} ya existe, cargando...")
+    return cargar_caso("caso1"), cargar_caso("caso2")
+
+
+# ─────────────────────────────────────────────────
+# 1. NaivOnArray  — O(n³)
+# ─────────────────────────────────────────────────
+def naiv_on_array(A, B):
+    n = A.shape[0]
+    C = np.zeros((n, n), dtype=np.int64)
+    for i in range(n):
+        for j in range(n):
+            for k in range(n):
+                C[i, j] += A[i, k] * B[k, j]
+    return C
+
+
+# ─────────────────────────────────────────────────
+# 2. NaivLoopUnrollingTwo  — O(n³)
+# ─────────────────────────────────────────────────
+def naiv_loop_unrolling_two(A, B):
+    n = A.shape[0]
+    C = np.zeros((n, n), dtype=np.int64)
+    for i in range(n):
+        for j in range(n):
+            s = 0
+            k = 0
+            while k < n - 1:        # desenrollado ×2
+                s += A[i, k] * B[k, j] + A[i, k+1] * B[k+1, j]
+                k += 2
+            if k < n:
+                s += A[i, k] * B[k, j]
+            C[i, j] = s
+    return C
+
+
+# ─────────────────────────────────────────────────
+# 3. NaivLoopUnrollingFour  — O(n³)
+# ─────────────────────────────────────────────────
+def naiv_loop_unrolling_four(A, B):
+    n = A.shape[0]
+    C = np.zeros((n, n), dtype=np.int64)
+    for i in range(n):
+        for j in range(n):
+            s = 0
+            k = 0
+            while k < n - 3:        # desenrollado ×4
+                s += (A[i, k]   * B[k,   j]
+                    + A[i, k+1] * B[k+1, j]
+                    + A[i, k+2] * B[k+2, j]
+                    + A[i, k+3] * B[k+3, j])
+                k += 4
+            while k < n:
+                s += A[i, k] * B[k, j]
+                k += 1
+            C[i, j] = s
+    return C
+
+
+# ─────────────────────────────────────────────────
+# 4. WinogradOriginal  — O(n³)  (reduce mult por precómputo)
+# ─────────────────────────────────────────────────
+def winograd_original(A, B):
+    n = A.shape[0]
+    C = np.zeros((n, n), dtype=np.int64)
+    row_factor = np.zeros(n, dtype=np.int64)
+    col_factor = np.zeros(n, dtype=np.int64)
+
+    half = n // 2
+    for i in range(n):
+        for j in range(half):
+            row_factor[i] += A[i, 2*j] * A[i, 2*j+1]
+    for j in range(n):
+        for i in range(half):
+            col_factor[j] += B[2*i, j] * B[2*i+1, j]
+
+    for i in range(n):
+        for j in range(n):
+            s = -row_factor[i] - col_factor[j]
+            for k in range(half):
+                s += (A[i, 2*k] + B[2*k+1, j]) * (A[i, 2*k+1] + B[2*k, j])
+            C[i, j] = s
+    if n % 2 == 1:
+        for i in range(n):
+            for j in range(n):
+                C[i, j] += A[i, n-1] * B[n-1, j]
+    return C
+
+
+# ─────────────────────────────────────────────────
+# 5. WinogradScaled  — O(n³)  (Winograd + escalado)
+# ─────────────────────────────────────────────────
+def winograd_scaled(A, B):
+    """
+    Versión escalada de Winograd: escala filas de A y columnas de B
+    por el máximo absoluto para mejorar la estabilidad numérica.
+    En enteros usamos la misma estructura pero escalamos a float64.
+    """
+    A_f = A.astype(np.float64)
+    B_f = B.astype(np.float64)
+    n = A_f.shape[0]
+
+    row_scale = np.max(np.abs(A_f), axis=1, keepdims=True)
+    row_scale[row_scale == 0] = 1
+    col_scale = np.max(np.abs(B_f), axis=0, keepdims=True)
+    col_scale[col_scale == 0] = 1
+
+    A_s = A_f / row_scale
+    B_s = B_f / col_scale
+
+    half = n // 2
+    row_factor = np.zeros(n)
+    col_factor = np.zeros(n)
+    for i in range(n):
+        for j in range(half):
+            row_factor[i] += A_s[i, 2*j] * A_s[i, 2*j+1]
+    for j in range(n):
+        for i in range(half):
+            col_factor[j] += B_s[2*i, j] * B_s[2*i+1, j]
+
+    C = np.zeros((n, n))
+    for i in range(n):
+        for j in range(n):
+            s = -row_factor[i] - col_factor[j]
+            for k in range(half):
+                s += (A_s[i, 2*k] + B_s[2*k+1, j]) * (A_s[i, 2*k+1] + B_s[2*k, j])
+            C[i, j] = s
+    if n % 2 == 1:
+        for i in range(n):
+            for j in range(n):
+                C[i, j] += A_s[i, n-1] * B_s[n-1, j]
+
+    scale_matrix = row_scale * col_scale
+    C = (C * scale_matrix).astype(np.int64)
+    return C
+
+
+# ─────────────────────────────────────────────────
+# 6. StrassenNaiv  — O(n^2.807)
+# ─────────────────────────────────────────────────
+def strassen_naiv(A, B, threshold=64):
+    n = A.shape[0]
+    if n <= threshold:
+        return A @ B   # numpy BLAS para la hoja recursiva
+
+    # Rellenar hasta potencia de 2
+    m = 1
+    while m < n:
+        m *= 2
+    A_p = np.zeros((m, m), dtype=A.dtype)
+    B_p = np.zeros((m, m), dtype=B.dtype)
+    A_p[:n, :n] = A
+    B_p[:n, :n] = B
+
+    C_p = _strassen_rec(A_p, B_p, threshold)
+    return C_p[:n, :n]
+
+def _strassen_rec(A, B, threshold):
+    n = A.shape[0]
+    if n <= threshold:
+        return A @ B
+    half = n // 2
+    A11, A12 = A[:half, :half], A[:half, half:]
+    A21, A22 = A[half:, :half], A[half:, half:]
+    B11, B12 = B[:half, :half], B[:half, half:]
+    B21, B22 = B[half:, :half], B[half:, half:]
+
+    M1 = _strassen_rec(A11 + A22, B11 + B22, threshold)
+    M2 = _strassen_rec(A21 + A22, B11,        threshold)
+    M3 = _strassen_rec(A11,        B12 - B22,  threshold)
+    M4 = _strassen_rec(A22,        B21 - B11,  threshold)
+    M5 = _strassen_rec(A11 + A12, B22,         threshold)
+    M6 = _strassen_rec(A21 - A11, B11 + B12,   threshold)
+    M7 = _strassen_rec(A12 - A22, B21 + B22,   threshold)
+
+    C = np.empty_like(A)
+    C[:half, :half] = M1 + M4 - M5 + M7
+    C[:half, half:] = M3 + M5
+    C[half:, :half] = M2 + M4
+    C[half:, half:] = M1 - M2 + M3 + M6
+    return C
+
+
+# ─────────────────────────────────────────────────
+# 7. StrassenWinograd  — O(n^2.807)  (menos adiciones)
+# ─────────────────────────────────────────────────
+def strassen_winograd(A, B, threshold=64):
+    n = A.shape[0]
+    if n <= threshold:
+        return A @ B
+    m = 1
+    while m < n:
+        m *= 2
+    A_p = np.zeros((m, m), dtype=A.dtype)
+    B_p = np.zeros((m, m), dtype=B.dtype)
+    A_p[:n, :n] = A
+    B_p[:n, :n] = B
+    C_p = _sw_rec(A_p, B_p, threshold)
+    return C_p[:n, :n]
+
+def _sw_rec(A, B, threshold):
+    n = A.shape[0]
+    if n <= threshold:
+        return A @ B
+    half = n // 2
+    A11, A12 = A[:half, :half], A[:half, half:]
+    A21, A22 = A[half:, :half], A[half:, half:]
+    B11, B12 = B[:half, :half], B[:half, half:]
+    B21, B22 = B[half:, :half], B[half:, half:]
+
+    S1  = A21 + A22
+    S2  = S1  - A11
+    S3  = A11 - A21
+    S4  = A12 - S2
+    S5  = B12 - B11
+    S6  = B22 - S5
+    S7  = B22 - B12
+    S8  = S6  - B21
+
+    M1 = _sw_rec(S2,  S6,  threshold)
+    M2 = _sw_rec(A11, B11, threshold)
+    M3 = _sw_rec(A12, B21, threshold)
+    M4 = _sw_rec(S3,  S7,  threshold)
+    M5 = _sw_rec(S1,  S5,  threshold)
+    M6 = _sw_rec(S4,  B22, threshold)
+    M7 = _sw_rec(A22, S8,  threshold)
+
+    T1 = M1 + M2
+    T2 = T1 + M4
+
+    C = np.empty_like(A)
+    C[:half, :half] = M2 + M3
+    C[:half, half:] = T1 + M5 + M6
+    C[half:, :half] = T2 - M7
+    C[half:, half:] = T2 + M5
+    return C
+
+
+# ─────────────────────────────────────────────────
+# 8–10. III: Row×Column  (sequential block / parallel block / enhanced parallel block)
+# ─────────────────────────────────────────────────
+def iii3_sequential_block(A, B, bsize=64):
+    """III.3 - Row by Column Sequential Block"""
+    n = A.shape[0]
+    C = np.zeros((n, n), dtype=np.int64)
+    for i1 in range(0, n, bsize):
+        for j1 in range(0, n, bsize):
+            for k1 in range(0, n, bsize):
+                i_end = min(i1 + bsize, n)
+                j_end = min(j1 + bsize, n)
+                k_end = min(k1 + bsize, n)
+                C[i1:i_end, j1:j_end] += A[i1:i_end, k1:k_end] @ B[k1:k_end, j1:j_end]
+    return C
+
+def iii4_parallel_block(A, B, bsize=64):
+    """III.4 - Row by Column Parallel Block"""
+    n = A.shape[0]
+    C = np.zeros((n, n), dtype=np.int64)
+    lock = threading.Lock()
+
+    def compute_block(i1):
+        local = np.zeros((n, n), dtype=np.int64)
+        for j1 in range(0, n, bsize):
+            for k1 in range(0, n, bsize):
+                i_end = min(i1 + bsize, n)
+                j_end = min(j1 + bsize, n)
+                k_end = min(k1 + bsize, n)
+                local[i1:i_end, j1:j_end] += A[i1:i_end, k1:k_end] @ B[k1:k_end, j1:j_end]
+        with lock:
+            C[:] += local
+
+    with ThreadPoolExecutor() as ex:
+        ex.map(compute_block, range(0, n, bsize))
+    return C
+
+def iii5_enhanced_parallel_block(A, B, bsize=64):
+    """III.5 - Row by Column Enhanced Parallel Block (mitades)"""
+    n = A.shape[0]
+    C = np.zeros((n, n), dtype=np.int64)
+    lock = threading.Lock()
+
+    def half_work(i_start, i_stop):
+        local = np.zeros((n, n), dtype=np.int64)
+        for i1 in range(i_start, i_stop, bsize):
+            for j1 in range(0, n, bsize):
+                for k1 in range(0, n, bsize):
+                    i_end = min(i1 + bsize, n)
+                    j_end = min(j1 + bsize, n)
+                    k_end = min(k1 + bsize, n)
+                    local[i1:i_end, j1:j_end] += A[i1:i_end, k1:k_end] @ B[k1:k_end, j1:j_end]
+        with lock:
+            C[:] += local
+
+    mid = n // 2
+    with ThreadPoolExecutor(max_workers=2) as ex:
+        f1 = ex.submit(half_work, 0, mid)
+        f2 = ex.submit(half_work, mid, n)
+        f1.result(); f2.result()
+    return C
+
+
+# ─────────────────────────────────────────────────
+# 11–13. IV: Row×Row  (sequential block / parallel block / enhanced parallel block)
+# ─────────────────────────────────────────────────
+def iv3_sequential_block(A, B, bsize=64):
+    """IV.3 - Row by Row Sequential Block"""
+    n = A.shape[0]
+    C = np.zeros((n, n), dtype=np.int64)
+    for i1 in range(0, n, bsize):
+        for j1 in range(0, n, bsize):
+            for k1 in range(0, n, bsize):
+                i_end = min(i1 + bsize, n)
+                j_end = min(j1 + bsize, n)
+                k_end = min(k1 + bsize, n)
+                # A[i,k] += B[i,j]*C[j,k]  → A_local = B_block @ C_block
+                C[i1:i_end, k1:k_end] += A[i1:i_end, j1:j_end] @ B[j1:j_end, k1:k_end]
+    return C
+
+def iv4_parallel_block(A, B, bsize=64):
+    """IV.4 - Row by Row Parallel Block"""
+    n = A.shape[0]
+    C = np.zeros((n, n), dtype=np.int64)
+    lock = threading.Lock()
+
+    def compute_block(i1):
+        local = np.zeros((n, n), dtype=np.int64)
+        for j1 in range(0, n, bsize):
+            for k1 in range(0, n, bsize):
+                i_end = min(i1 + bsize, n)
+                j_end = min(j1 + bsize, n)
+                k_end = min(k1 + bsize, n)
+                local[i1:i_end, k1:k_end] += A[i1:i_end, j1:j_end] @ B[j1:j_end, k1:k_end]
+        with lock:
+            C[:] += local
+
+    with ThreadPoolExecutor() as ex:
+        ex.map(compute_block, range(0, n, bsize))
+    return C
+
+def iv5_enhanced_parallel_block(A, B, bsize=64):
+    """IV.5 - Row by Row Enhanced Parallel Block"""
+    n = A.shape[0]
+    C = np.zeros((n, n), dtype=np.int64)
+    lock = threading.Lock()
+
+    def half_work(i_start, i_stop):
+        local = np.zeros((n, n), dtype=np.int64)
+        for i1 in range(i_start, i_stop, bsize):
+            for j1 in range(0, n, bsize):
+                for k1 in range(0, n, bsize):
+                    i_end = min(i1 + bsize, n)
+                    j_end = min(j1 + bsize, n)
+                    k_end = min(k1 + bsize, n)
+                    local[i1:i_end, k1:k_end] += A[i1:i_end, j1:j_end] @ B[j1:j_end, k1:k_end]
+        with lock:
+            C[:] += local
+
+    mid = n // 2
+    with ThreadPoolExecutor(max_workers=2) as ex:
+        f1 = ex.submit(half_work, 0, mid)
+        f2 = ex.submit(half_work, mid, n)
+        f1.result(); f2.result()
+    return C
+
+
+# ─────────────────────────────────────────────────
+# 14–15. V: Column×Column  (sequential block / parallel block)
+# ─────────────────────────────────────────────────
+def v3_sequential_block(A, B, bsize=64):
+    """V.3 - Column by Column Sequential Block"""
+    n = A.shape[0]
+    C = np.zeros((n, n), dtype=np.int64)
+    for i1 in range(0, n, bsize):
+        for j1 in range(0, n, bsize):
+            for k1 in range(0, n, bsize):
+                i_end = min(i1 + bsize, n)
+                j_end = min(j1 + bsize, n)
+                k_end = min(k1 + bsize, n)
+                # A[k,i] += B[k,j]*C[j,i]
+                C[k1:k_end, i1:i_end] += A[k1:k_end, j1:j_end] @ B[j1:j_end, i1:i_end]
+    return C
+
+def v4_parallel_block(A, B, bsize=64):
+    """V.4 - Column by Column Parallel Block"""
+    n = A.shape[0]
+    C = np.zeros((n, n), dtype=np.int64)
+    lock = threading.Lock()
+
+    def compute_block(i1):
+        local = np.zeros((n, n), dtype=np.int64)
+        for j1 in range(0, n, bsize):
+            for k1 in range(0, n, bsize):
+                i_end = min(i1 + bsize, n)
+                j_end = min(j1 + bsize, n)
+                k_end = min(k1 + bsize, n)
+                local[k1:k_end, i1:i_end] += A[k1:k_end, j1:j_end] @ B[j1:j_end, i1:i_end]
+        with lock:
+            C[:] += local
+
+    with ThreadPoolExecutor() as ex:
+        ex.map(compute_block, range(0, n, bsize))
+    return C
+
+
+# ─────────────────────────────────────────────────
+# EJECUTOR CON MEDICIÓN DE TIEMPO
+# ─────────────────────────────────────────────────
+
+ALGORITMOS = [
+    ("NaivOnArray",               naiv_on_array),
+    ("NaivLoopUnrollingTwo",      naiv_loop_unrolling_two),
+    ("NaivLoopUnrollingFour",     naiv_loop_unrolling_four),
+    ("WinogradOriginal",          winograd_original),
+    ("WinogradScaled",            winograd_scaled),
+    ("StrassenNaiv",              strassen_naiv),
+    ("StrassenWinograd",          strassen_winograd),
+    ("III.3 Sequential Block",    iii3_sequential_block),
+    ("III.4 Parallel Block",      iii4_parallel_block),
+    ("III.5 Enhanced Par Block",  iii5_enhanced_parallel_block),
+    ("IV.3 Sequential Block",     iv3_sequential_block),
+    ("IV.4 Parallel Block",       iv4_parallel_block),
+    ("IV.5 Enhanced Par Block",   iv5_enhanced_parallel_block),
+    ("V.3 Sequential Block",      v3_sequential_block),
+    ("V.4 Parallel Block",        v4_parallel_block),
+]
+
+COMPLEJIDADES = {
+    "NaivOnArray":              "O(n³)",
+    "NaivLoopUnrollingTwo":     "O(n³)",
+    "NaivLoopUnrollingFour":    "O(n³)",
+    "WinogradOriginal":         "O(n³)",
+    "WinogradScaled":           "O(n³)",
+    "StrassenNaiv":             "O(n^2.807)",
+    "StrassenWinograd":         "O(n^2.807)",
+    "III.3 Sequential Block":   "O(n³)",
+    "III.4 Parallel Block":     "O(n³/p)",
+    "III.5 Enhanced Par Block": "O(n³/p)",
+    "IV.3 Sequential Block":    "O(n³)",
+    "IV.4 Parallel Block":      "O(n³/p)",
+    "IV.5 Enhanced Par Block":  "O(n³/p)",
+    "V.3 Sequential Block":     "O(n³)",
+    "V.4 Parallel Block":       "O(n³/p)",
+}
+
+
+def ejecutar_algoritmos(A, B, caso_nombre, usar_naiv_puro=True):
+    """Ejecuta todos los algoritmos y retorna resultados con tiempos en ms."""
+    n = A.shape[0]
+    resultados = {}
+
+    # Límite para algoritmos O(n³) puros en Python (muy lentos)
+    LIMITE_NAIV = 64   # si n > LIMITE_NAIV, los naiv puros se omiten
+
+    for nombre, func in ALGORITMOS:
+        es_naiv_puro = nombre in ("NaivOnArray", "NaivLoopUnrollingTwo",
+                                  "NaivLoopUnrollingFour", "WinogradOriginal",
+                                  "WinogradScaled")
+
+        if es_naiv_puro and n > LIMITE_NAIV and not usar_naiv_puro:
+            print(f"  [{caso_nombre}] {nombre:30s}  OMITIDO (n={n} > {LIMITE_NAIV})")
+            resultados[nombre] = None
+            continue
+
+        print(f"  [{caso_nombre}] {nombre:30s} ...", end="", flush=True)
+        t0 = time.perf_counter()
+        C = func(A, B)
+        t1 = time.perf_counter()
+        ms = (t1 - t0) * 1000
+        print(f"  {ms:10.3f} ms")
+        resultados[nombre] = round(ms, 4)
+
+    return resultados
+
+
+def guardar_resultados(resultados_c1, n1, resultados_c2, n2):
+    data = {
+        "caso1": {"n": n1, "tiempos_ms": resultados_c1},
+        "caso2": {"n": n2, "tiempos_ms": resultados_c2},
+        "complejidades": COMPLEJIDADES,
+    }
+    with open("resultados.json", "w") as f:
+        json.dump(data, f, indent=2)
+    print("\nResultados guardados en resultados.json")
+
+
+# ─────────────────────────────────────────────────
+# MAIN
+# ─────────────────────────────────────────────────
+if __name__ == "__main__":
+    # Tamaños: deben ser factor de 2^k. Usamos 128 y 256
+    N1, N2 = 128, 256
+
+    print("=" * 60)
+    print("PREPARANDO CASOS DE PRUEBA")
+    print("=" * 60)
+    (A1, B1), (A2, B2) = preparar_casos(N1, N2)
+    print(f"  Caso 1: {A1.shape}  |  Caso 2: {A2.shape}\n")
+
+    print("=" * 60)
+    print(f"EJECUTANDO ALGORITMOS — CASO 1 (n={N1})")
+    print("=" * 60)
+    r1 = ejecutar_algoritmos(A1, B1, "caso1", usar_naiv_puro=True)
+
+    print("\n" + "=" * 60)
+    print(f"EJECUTANDO ALGORITMOS — CASO 2 (n={N2})")
+    print("=" * 60)
+    # Para n=256 los naiv puros en Python tardarían horas; los marcamos None
+    r2 = ejecutar_algoritmos(A2, B2, "caso2", usar_naiv_puro=False)
+
+    guardar_resultados(r1, N1, r2, N2)
+    print("\n✓ Ejecución completada.")
