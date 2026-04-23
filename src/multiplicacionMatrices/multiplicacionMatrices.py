@@ -531,6 +531,10 @@ def ejecutar_algoritmos(A, B, caso_nombre, usar_naiv_puro=True):
     resultados = {}
 
     # Límite para algoritmos O(n³) puros en Python (muy lentos)
+    # CRITERIO DE OMISIÓN: "lento" = algoritmos con complejidad O(n³) que exceden
+    # el límite de tamaño n. Con n > 64, estos algoritmos tomarían más de 60 segundos
+    # en matrices de 512x512 y más de 8 minutos en 1024x1024, haciéndolos imprácticos.
+    # Por ejemplo: NaivOnArray con n=512 toma ~123 segundos vs Strassen que toma ~0.2 segundos.
     LIMITE_NAIV = 64   # si n > LIMITE_NAIV, los naiv puros se omiten
 
     for nombre, func in ALGORITMOS:
@@ -605,7 +609,7 @@ def visualizar_resultados(resultados_c1, n1, resultados_c2, n2):
     for name in todos_algoritmos:
         val = resultados_c1.get(name)
         omitidos_c1.append(val is None)
-        times_c1.append(val if val is not None else 0)
+        times_c1.append(val if val is not None else 0.1)  # Small value for log scale
     
     # Preparar datos para Caso 2
     times_c2 = []
@@ -613,7 +617,7 @@ def visualizar_resultados(resultados_c1, n1, resultados_c2, n2):
     for name in todos_algoritmos:
         val = resultados_c2.get(name)
         omitidos_c2.append(val is None)
-        times_c2.append(val if val is not None else 0)
+        times_c2.append(val if val is not None else 0.1)  # Small value for log scale
     
     # Crear figura con dos subplots
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(20, 7))
@@ -633,6 +637,7 @@ def visualizar_resultados(resultados_c1, n1, resultados_c2, n2):
     ax1.set_xlabel("Algoritmo", fontsize=11, fontweight='bold')
     ax1.set_ylabel("Tiempo (ms)", fontsize=11, fontweight='bold')
     ax1.set_title(f"Caso 1 - Matrices {n1}×{n1}", fontsize=12, fontweight='bold')
+    ax1.set_yscale('log')
     ax1.set_xticks(range(len(todos_algoritmos)))
     ax1.set_xticklabels(todos_algoritmos, rotation=45, ha='right', fontsize=8.5)
     ax1.grid(axis='y', alpha=0.3, linestyle='--')
@@ -640,7 +645,7 @@ def visualizar_resultados(resultados_c1, n1, resultados_c2, n2):
     # Agregar etiqueta "OMITIDO" sobre barras omitidas en Caso 1
     for i, omitido in enumerate(omitidos_c1):
         if omitido:
-            ax1.text(i, 0.5, 'OMITIDO', ha='center', va='bottom', fontsize=7, style='italic', color='#666666')
+            ax1.text(i, 0.15, 'OMITIDO', ha='center', va='bottom', fontsize=7, style='italic', color='#666666')
     
     # Gráfico Caso 2
     colors2 = [get_color(name, omitidos_c2[i]) for i, name in enumerate(todos_algoritmos)]
@@ -648,6 +653,7 @@ def visualizar_resultados(resultados_c1, n1, resultados_c2, n2):
     ax2.set_xlabel("Algoritmo", fontsize=11, fontweight='bold')
     ax2.set_ylabel("Tiempo (ms)", fontsize=11, fontweight='bold')
     ax2.set_title(f"Caso 2 - Matrices {n2}×{n2}", fontsize=12, fontweight='bold')
+    ax2.set_yscale('log')
     ax2.set_xticks(range(len(todos_algoritmos)))
     ax2.set_xticklabels(todos_algoritmos, rotation=45, ha='right', fontsize=8.5)
     ax2.grid(axis='y', alpha=0.3, linestyle='--')
@@ -655,7 +661,7 @@ def visualizar_resultados(resultados_c1, n1, resultados_c2, n2):
     # Agregar etiqueta "OMITIDO" sobre barras omitidas en Caso 2
     for i, omitido in enumerate(omitidos_c2):
         if omitido:
-            ax2.text(i, 0.5, 'OMITIDO', ha='center', va='bottom', fontsize=7, style='italic', color='#666666')
+            ax2.text(i, 0.15, 'OMITIDO', ha='center', va='bottom', fontsize=7, style='italic', color='#666666')
     
     # Agregar leyenda
     from matplotlib.patches import Patch
@@ -674,7 +680,7 @@ def visualizar_resultados(resultados_c1, n1, resultados_c2, n2):
     print(f"✓ Gráfico guardado: {chart_path} (15 algoritmos totales)")
     
     # Mostrar (opcional)
-    plt.show()
+    # plt.show()
 
 
 # ─────────────────────────────────────────────────
@@ -682,7 +688,7 @@ def visualizar_resultados(resultados_c1, n1, resultados_c2, n2):
 # ─────────────────────────────────────────────────
 if __name__ == "__main__":
     # Tamaños: deben ser factor de 2^k. Usamos 128 y 256
-    N1, N2 = 128, 256
+    N1, N2 = 512, 1024
 
     print("=" * 60)
     print("PREPARANDO CASOS DE PRUEBA")
