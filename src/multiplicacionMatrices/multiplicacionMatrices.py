@@ -9,8 +9,11 @@ import time
 import json
 import os
 import math
+import csv
+import pickle
 from concurrent.futures import ThreadPoolExecutor
 import threading
+import matplotlib.pyplot as plt
 
 # ─────────────────────────────────────────────────
 # GENERACIÓN Y PERSISTENCIA DE CASOS DE PRUEBA
@@ -39,16 +42,45 @@ def preparar_casos(n1, n2):
     Prepara 2 casos de prueba. n debe ser factor de 2^k (requerimiento).
     Caso 1: n1×n1   Caso 2: n2×n2
     """
+    import shutil
+    
     os.makedirs("casos", exist_ok=True)
+    
+    # Verificar si los tamaños actuales coinciden con lo solicitado
+    caso1_path = "casos/caso1"
+    caso2_path = "casos/caso2"
+    
+    # Si existen pero los tamaños no coinciden, limpiar todo
+    tamaños_correctos = True
+    if os.path.exists(f"{caso1_path}/A.npy"):
+        A1_exist = np.load(f"{caso1_path}/A.npy")
+        if A1_exist.shape[0] != n1:
+            tamaños_correctos = False
+    if os.path.exists(f"{caso2_path}/A.npy"):
+        A2_exist = np.load(f"{caso2_path}/A.npy")
+        if A2_exist.shape[0] != n2:
+            tamaños_correctos = False
+    
+    # Si algo está mal, limpiar carpeta completa
+    if not tamaños_correctos and os.path.exists("casos"):
+        print(f"  ⚠ Tamaños detectados no coinciden. Limpiando carpeta 'casos/'...")
+        shutil.rmtree("casos")
+        os.makedirs("casos", exist_ok=True)
+    
+    # Ahora generar/cargar con los tamaños correctos
     for nombre, n, seed in [("caso1", n1, 42), ("caso2", n2, 99)]:
         path = f"casos/{nombre}"
-        if not os.path.exists(f"{path}/A.npy"):
+        A_path = f"{path}/A.npy"
+        B_path = f"{path}/B.npy"
+        
+        if not os.path.exists(A_path) or not os.path.exists(B_path):
             print(f"  Generando {nombre} ({n}×{n})...")
             A = generar_matriz(n, seed)
             B = generar_matriz(n, seed + 1)
             guardar_caso(nombre, A, B)
         else:
-            print(f"  {nombre} ya existe, cargando...")
+            print(f"  {nombre} ya existe con tamaño ({n}×{n}), cargando...")
+    
     return cargar_caso("caso1"), cargar_caso("caso2")
 
 
@@ -523,14 +555,126 @@ def ejecutar_algoritmos(A, B, caso_nombre, usar_naiv_puro=True):
 
 
 def guardar_resultados(resultados_c1, n1, resultados_c2, n2):
+    # Crear directorio de persistencia
+    persist_dir = "persistencia"
+    os.makedirs(persist_dir, exist_ok=True)
+    
     data = {
         "caso1": {"n": n1, "tiempos_ms": resultados_c1},
         "caso2": {"n": n2, "tiempos_ms": resultados_c2},
         "complejidades": COMPLEJIDADES,
     }
-    with open("resultados.json", "w") as f:
+    
+    # Guardar en JSON
+    json_path = f"{persist_dir}/resultados.json"
+    with open(json_path, "w") as f:
         json.dump(data, f, indent=2)
-    print("\nResultados guardados en resultados.json")
+    print(f"✓ JSON guardado: {json_path}")
+    
+    # Guardar en Pickle (binario más robusto)
+    pickle_path = f"{persist_dir}/resultados.pkl"
+    with open(pickle_path, "wb") as f:
+        pickle.dump(data, f)
+    print(f"✓ Pickle guardado: {pickle_path}")
+    
+    # Guardar en CSV (formato tabular)
+    csv_path = f"{persist_dir}/resultados.csv"
+    with open(csv_path, "w", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerow(["Algoritmo", f"Caso1 (n={n1})", f"Caso2 (n={n2})", "Complejidad"])
+        for nombre in [algo[0] for algo in ALGORITMOS]:
+            t1 = resultados_c1.get(nombre)
+            t2 = resultados_c2.get(nombre)
+            comp = COMPLEJIDADES.get(nombre, "?")
+            t1_str = f"{t1:.4f}" if t1 is not None else "OMITIDO"
+            t2_str = f"{t2:.4f}" if t2 is not None else "OMITIDO"
+            writer.writerow([nombre, t1_str, t2_str, comp])
+    print(f"✓ CSV guardado: {csv_path}")
+
+
+def visualizar_resultados(resultados_c1, n1, resultados_c2, n2):
+    """Genera diagramas de barras comparativos para los tiempos de ejecución (todos los 15 algoritmos)."""
+    persist_dir = "persistencia"
+    
+    # Obtener todos los nombres de algoritmos (15 totales)
+    todos_algoritmos = [name for name, _ in ALGORITMOS]
+    
+    # Preparar datos para Caso 1
+    times_c1 = []
+    omitidos_c1 = []
+    for name in todos_algoritmos:
+        val = resultados_c1.get(name)
+        omitidos_c1.append(val is None)
+        times_c1.append(val if val is not None else 0)
+    
+    # Preparar datos para Caso 2
+    times_c2 = []
+    omitidos_c2 = []
+    for name in todos_algoritmos:
+        val = resultados_c2.get(name)
+        omitidos_c2.append(val is None)
+        times_c2.append(val if val is not None else 0)
+    
+    # Crear figura con dos subplots
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(20, 7))
+    
+    # Función auxiliar para determinar color
+    def get_color(name, omitido):
+        if omitido:
+            return '#cccccc'  # Gris claro para omitidos
+        elif COMPLEJIDADES.get(name, '').startswith('O(n^2'):
+            return '#1f77b4'  # Azul para Strassen
+        else:
+            return '#ff7f0e'  # Naranja para otros
+    
+    # Gráfico Caso 1
+    colors1 = [get_color(name, omitidos_c1[i]) for i, name in enumerate(todos_algoritmos)]
+    bars1 = ax1.bar(range(len(todos_algoritmos)), times_c1, color=colors1, edgecolor='black', alpha=0.85)
+    ax1.set_xlabel("Algoritmo", fontsize=11, fontweight='bold')
+    ax1.set_ylabel("Tiempo (ms)", fontsize=11, fontweight='bold')
+    ax1.set_title(f"Caso 1 - Matrices {n1}×{n1}", fontsize=12, fontweight='bold')
+    ax1.set_xticks(range(len(todos_algoritmos)))
+    ax1.set_xticklabels(todos_algoritmos, rotation=45, ha='right', fontsize=8.5)
+    ax1.grid(axis='y', alpha=0.3, linestyle='--')
+    
+    # Agregar etiqueta "OMITIDO" sobre barras omitidas en Caso 1
+    for i, omitido in enumerate(omitidos_c1):
+        if omitido:
+            ax1.text(i, 0.5, 'OMITIDO', ha='center', va='bottom', fontsize=7, style='italic', color='#666666')
+    
+    # Gráfico Caso 2
+    colors2 = [get_color(name, omitidos_c2[i]) for i, name in enumerate(todos_algoritmos)]
+    bars2 = ax2.bar(range(len(todos_algoritmos)), times_c2, color=colors2, edgecolor='black', alpha=0.85)
+    ax2.set_xlabel("Algoritmo", fontsize=11, fontweight='bold')
+    ax2.set_ylabel("Tiempo (ms)", fontsize=11, fontweight='bold')
+    ax2.set_title(f"Caso 2 - Matrices {n2}×{n2}", fontsize=12, fontweight='bold')
+    ax2.set_xticks(range(len(todos_algoritmos)))
+    ax2.set_xticklabels(todos_algoritmos, rotation=45, ha='right', fontsize=8.5)
+    ax2.grid(axis='y', alpha=0.3, linestyle='--')
+    
+    # Agregar etiqueta "OMITIDO" sobre barras omitidas en Caso 2
+    for i, omitido in enumerate(omitidos_c2):
+        if omitido:
+            ax2.text(i, 0.5, 'OMITIDO', ha='center', va='bottom', fontsize=7, style='italic', color='#666666')
+    
+    # Agregar leyenda
+    from matplotlib.patches import Patch
+    legend_elements = [
+        Patch(facecolor='#1f77b4', alpha=0.85, edgecolor='black', label='Strassen O(n^2.807)'),
+        Patch(facecolor='#ff7f0e', alpha=0.85, edgecolor='black', label='Otros O(n³) / Paralelos'),
+        Patch(facecolor='#cccccc', alpha=0.85, edgecolor='black', label='Omitido (muy lento)')
+    ]
+    fig.legend(handles=legend_elements, loc='upper center', bbox_to_anchor=(0.5, -0.01), ncol=3, fontsize=10)
+    
+    plt.tight_layout()
+    
+    # Guardar figura
+    chart_path = f"{persist_dir}/benchmark_chart.png"
+    plt.savefig(chart_path, dpi=150, bbox_inches='tight')
+    print(f"✓ Gráfico guardado: {chart_path} (15 algoritmos totales)")
+    
+    # Mostrar (opcional)
+    plt.show()
 
 
 # ─────────────────────────────────────────────────
@@ -557,5 +701,14 @@ if __name__ == "__main__":
     # Para n=256 los naiv puros en Python tardarían horas; los marcamos None
     r2 = ejecutar_algoritmos(A2, B2, "caso2", usar_naiv_puro=False)
 
+    print("\n" + "=" * 60)
+    print("GUARDANDO RESULTADOS")
+    print("=" * 60)
     guardar_resultados(r1, N1, r2, N2)
+    
+    print("\n" + "=" * 60)
+    print("GENERANDO VISUALIZACIONES")
+    print("=" * 60)
+    visualizar_resultados(r1, N1, r2, N2)
+    
     print("\n✓ Ejecución completada.")
