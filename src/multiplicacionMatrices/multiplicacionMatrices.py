@@ -11,6 +11,8 @@ import os
 import math
 import csv
 import pickle
+import psutil
+import gc
 from concurrent.futures import ThreadPoolExecutor
 import threading
 import matplotlib.pyplot as plt
@@ -526,7 +528,7 @@ COMPLEJIDADES = {
 
 
 def ejecutar_algoritmos(A, B, caso_nombre, usar_naiv_puro=True):
-    """Ejecuta todos los algoritmos y retorna resultados con tiempos en ms."""
+    """Ejecuta todos los algoritmos y retorna resultados con tiempos, memoria y CPU."""
     n = A.shape[0]
     resultados = {}
 
@@ -536,6 +538,13 @@ def ejecutar_algoritmos(A, B, caso_nombre, usar_naiv_puro=True):
     # en matrices de 512x512 y más de 8 minutos en 1024x1024, haciéndolos imprácticos.
     # Por ejemplo: NaivOnArray con n=512 toma ~123 segundos vs Strassen que toma ~0.2 segundos.
     LIMITE_NAIV = 64   # si n > LIMITE_NAIV, los naiv puros se omiten
+
+    # Obtener proceso actual
+    proceso = psutil.Process()
+    
+    # Limpiar garbage antes de medir
+    gc.collect()
+    mem_inicial = proceso.memory_info().rss / 1024 / 1024  # MB
 
     for nombre, func in ALGORITMOS:
         es_naiv_puro = nombre in ("NaivOnArray", "NaivLoopUnrollingTwo",
@@ -548,12 +557,30 @@ def ejecutar_algoritmos(A, B, caso_nombre, usar_naiv_puro=True):
             continue
 
         print(f"  [{caso_nombre}] {nombre:30s} ...", end="", flush=True)
+        
+        # Medir tiempo, memoria y CPU
+        gc.collect()
+        mem_antes = proceso.memory_info().rss / 1024 / 1024  # MB
+        cpu_antes = proceso.cpu_percent(interval=None)
+        
         t0 = time.perf_counter()
         C = func(A, B)
         t1 = time.perf_counter()
+        
+        # Obtener CPU y memoria después
+        cpu_despues = proceso.cpu_percent(interval=None)
+        mem_despues = proceso.memory_info().rss / 1024 / 1024  # MB
+        
         ms = (t1 - t0) * 1000
-        print(f"  {ms:10.3f} ms")
-        resultados[nombre] = round(ms, 4)
+        mem_usada = max(0, mem_despues - mem_antes)  # MB adicionales usadas
+        cpu_usado = cpu_despues if cpu_despues > 0 else proceso.cpu_percent(interval=0.1)
+        
+        print(f"  {ms:10.3f} ms | Mem: {mem_usada:6.2f} MB | CPU: {cpu_usado:5.1f}%")
+        resultados[nombre] = {
+            "tiempo_ms": round(ms, 4),
+            "memoria_mb": round(mem_usada, 2),
+            "cpu_porcentaje": round(cpu_usado, 2)
+        }
 
     return resultados
 
@@ -563,9 +590,23 @@ def guardar_resultados(resultados_c1, n1, resultados_c2, n2):
     persist_dir = "persistencia"
     os.makedirs(persist_dir, exist_ok=True)
     
+    # Convertir resultados a formato serializable
+    resultados_c1_serial = {}
+    resultados_c2_serial = {}
+    for k, v in resultados_c1.items():
+        if v is None:
+            resultados_c1_serial[k] = None
+        else:
+            resultados_c1_serial[k] = v
+    for k, v in resultados_c2.items():
+        if v is None:
+            resultados_c2_serial[k] = None
+        else:
+            resultados_c2_serial[k] = v
+    
     data = {
-        "caso1": {"n": n1, "tiempos_ms": resultados_c1},
-        "caso2": {"n": n2, "tiempos_ms": resultados_c2},
+        "caso1": {"n": n1, "resultados": resultados_c1_serial},
+        "caso2": {"n": n2, "resultados": resultados_c2_serial},
         "complejidades": COMPLEJIDADES,
     }
     
@@ -581,18 +622,29 @@ def guardar_resultados(resultados_c1, n1, resultados_c2, n2):
         pickle.dump(data, f)
     print(f"✓ Pickle guardado: {pickle_path}")
     
-    # Guardar en CSV (formato tabular)
+    # Guardar en CSV (formato tabular con tiempo, memoria y CPU)
     csv_path = f"{persist_dir}/resultados.csv"
     with open(csv_path, "w", newline="") as f:
         writer = csv.writer(f)
-        writer.writerow(["Algoritmo", f"Caso1 (n={n1})", f"Caso2 (n={n2})", "Complejidad"])
+        writer.writerow(["Algoritmo", "Complejidad", 
+                        f"Caso1_Tiempo_ms", f"Caso1_Memoria_MB", f"Caso1_CPU_%",
+                        f"Caso2_Tiempo_ms", f"Caso2_Memoria_MB", f"Caso2_CPU_%"])
         for nombre in [algo[0] for algo in ALGORITMOS]:
-            t1 = resultados_c1.get(nombre)
-            t2 = resultados_c2.get(nombre)
+            r1 = resultados_c1.get(nombre)
+            r2 = resultados_c2.get(nombre)
             comp = COMPLEJIDADES.get(nombre, "?")
-            t1_str = f"{t1:.4f}" if t1 is not None else "OMITIDO"
-            t2_str = f"{t2:.4f}" if t2 is not None else "OMITIDO"
-            writer.writerow([nombre, t1_str, t2_str, comp])
+            
+            if r1 is None:
+                t1, m1, c1 = "OMITIDO", "OMITIDO", "OMITIDO"
+            else:
+                t1, m1, c1 = r1.get("tiempo_ms", ""), r1.get("memoria_mb", ""), r1.get("cpu_porcentaje", "")
+            
+            if r2 is None:
+                t2, m2, c2 = "OMITIDO", "OMITIDO", "OMITIDO"
+            else:
+                t2, m2, c2 = r2.get("tiempo_ms", ""), r2.get("memoria_mb", ""), r2.get("cpu_porcentaje", "")
+            
+            writer.writerow([nombre, comp, t1, m1, c1, t2, m2, c2])
     print(f"✓ CSV guardado: {csv_path}")
 
 
@@ -608,16 +660,30 @@ def visualizar_resultados(resultados_c1, n1, resultados_c2, n2):
     omitidos_c1 = []
     for name in todos_algoritmos:
         val = resultados_c1.get(name)
-        omitidos_c1.append(val is None)
-        times_c1.append(val if val is not None else 0.1)  # Small value for log scale
+        if val is None:
+            omitidos_c1.append(True)
+            times_c1.append(0.1)
+        elif isinstance(val, dict):
+            omitidos_c1.append(False)
+            times_c1.append(val.get("tiempo_ms", 0.1))
+        else:
+            omitidos_c1.append(False)
+            times_c1.append(val if val else 0.1)
     
     # Preparar datos para Caso 2
     times_c2 = []
     omitidos_c2 = []
     for name in todos_algoritmos:
         val = resultados_c2.get(name)
-        omitidos_c2.append(val is None)
-        times_c2.append(val if val is not None else 0.1)  # Small value for log scale
+        if val is None:
+            omitidos_c2.append(True)
+            times_c2.append(0.1)
+        elif isinstance(val, dict):
+            omitidos_c2.append(False)
+            times_c2.append(val.get("tiempo_ms", 0.1))
+        else:
+            omitidos_c2.append(False)
+            times_c2.append(val if val else 0.1)
     
     # Crear figura con dos subplots
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(20, 7))
@@ -688,7 +754,7 @@ def visualizar_resultados(resultados_c1, n1, resultados_c2, n2):
 # ─────────────────────────────────────────────────
 if __name__ == "__main__":
     # Tamaños: deben ser factor de 2^k. Usamos 128 y 256
-    N1, N2 = 512, 1024
+    N1, N2 = 128, 256
 
     print("=" * 60)
     print("PREPARANDO CASOS DE PRUEBA")
