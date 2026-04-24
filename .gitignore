@@ -213,6 +213,10 @@ reports/
 results/
 data/example/
 
+# Casos de prueba y resultados de benchmark (generados localmente)
+casos/
+persistencia/
+
 # Extensiones de salida
 *.csv
 *.png
