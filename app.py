@@ -155,7 +155,16 @@ def visualizacion_section(df):
         with st.spinner("Creando reporte PDF..."):
             ruta_pdf = generar_reporte_pdf(df)
         st.success(f"Reporte PDF guardado en: {ruta_pdf}")
-        st.markdown(f"[Descargar PDF]({ruta_pdf})")
+        if Path(ruta_pdf).exists():
+            pdf_bytes = Path(ruta_pdf).read_bytes()
+            st.download_button(
+                label="Descargar reporte PDF",
+                data=pdf_bytes,
+                file_name=Path(ruta_pdf).name,
+                mime="application/pdf"
+            )
+        else:
+            st.error("No se encontró el archivo PDF generado.")
 
 
 def main():
