@@ -20,6 +20,9 @@ from typing import List, Dict, Tuple, Any
 import os
 from datetime import datetime
 
+# Importar función de correlación del módulo similarity
+from src.similarity import correlacion_pearson
+
 # Configuración de estilo
 plt.style.use('seaborn-v0_8-whitegrid')
 sns.set_palette("husl")
@@ -130,11 +133,40 @@ def generar_matriz_correlacion(df: pd.DataFrame) -> pd.DataFrame:
     # Pivotar para tener tickers como columnas
     precios_pivot = df.pivot(index='Date', columns='Ticker', values='Close')
     
-    # Calcular retornos
-    retornos = precios_pivot.pct_change().dropna()
+    # Calcular retornos MANUALMENTE (sin usar pct_change)
+    # retornos[t] = (precio[t] - precio[t-1]) / precio[t-1]
+    retornos_dict = {}
+    for ticker in precios_pivot.columns:
+        precios = precios_pivot[ticker].values
+        # Calcular retornos diarios manualmente
+        retornos = np.diff(precios) / precios[:-1]
+        # Filtrar NaN, infinitos y valores extremos
+        retornos = retornos[np.isfinite(retornos)]
+        retornos = retornos[np.abs(retornos) < 1.0]
+        retornos_dict[ticker] = retornos
     
-    # Calcular matriz de correlación
-    correlacion = retornos.corr()
+    # Encontrar la longitud mínima para alinear todas las series
+    min_length = min(len(r) for r in retornos_dict.values())
+    
+    # Calcular matriz de correlación usando correlacion_pearson
+    tickers = list(retornos_dict.keys())
+    n = len(tickers)
+    matriz_corr = np.zeros((n, n))
+    
+    for i, ticker1 in enumerate(tickers):
+        for j, ticker2 in enumerate(tickers):
+            if i == j:
+                matriz_corr[i, j] = 1.0
+            elif i < j:
+                # Usar los primeros min_length elementos para cada serie
+                retornos1 = retornos_dict[ticker1][:min_length]
+                retornos2 = retornos_dict[ticker2][:min_length]
+                corr = correlacion_pearson(retornos1, retornos2)
+                matriz_corr[i, j] = corr
+                matriz_corr[j, i] = corr
+    
+    # Convertir a DataFrame
+    correlacion = pd.DataFrame(matriz_corr, index=tickers, columns=tickers)
     
     return correlacion
 
