@@ -430,9 +430,9 @@ def similitud_coseno(serie1: np.ndarray, serie2: np.ndarray) -> float:
     # Calcular producto punto
     producto_punto = np.dot(serie1, serie2)
     
-    # Calcular normas
-    norma1 = np.linalg.norm(serie1)
-    norma2 = np.linalg.norm(serie2)
+    # Calcular normas manualmente: ||x|| = √(Σ(xi²))
+    norma1 = np.sqrt(np.sum(serie1 ** 2))
+    norma2 = np.sqrt(np.sum(serie2 ** 2))
     
     # Evitar división por cero
     if norma1 == 0 or norma2 == 0:
