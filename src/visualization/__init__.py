@@ -218,7 +218,7 @@ def graficar_mapa_calor(correlacion: pd.DataFrame, guardar: bool = True) -> plt.
     if guardar:
         os.makedirs('reports', exist_ok=True)
         fig.savefig('reports/mapa_calor_correlacion.png', dpi=150, bbox_inches='tight')
-        print("✅ Mapa de calor guardado en: reports/mapa_calor_correlacion.png")
+        print("Mapa de calor guardado en: reports/mapa_calor_correlacion.png")
     
     return fig
 
@@ -253,7 +253,7 @@ def graficar_candlestick(df: pd.DataFrame, ticker: str,
     df_ticker = df[df['Ticker'] == ticker].sort_values('Date').copy()
     
     if len(df_ticker) == 0:
-        print(f"❌ No se encontró el ticker: {ticker}")
+        print(f"No se encontró el ticker: {ticker}")
         return None
     
     # Tomar los últimos 90 días para mejor visualización
@@ -325,7 +325,7 @@ def graficar_candlestick(df: pd.DataFrame, ticker: str,
         os.makedirs('reports', exist_ok=True)
         filename = f'reports/candlestick_{ticker}.png'
         fig.savefig(filename, dpi=150, bbox_inches='tight')
-        print(f"✅ Candlestick guardado en: {filename}")
+        print(f"Candlestick guardado en: {filename}")
     
     return fig
 
@@ -392,7 +392,7 @@ def generar_reporte_pdf(df: pd.DataFrame,
         from reportlab.lib.pagesizes import letter
         from reportlab.lib import colors
         from reportlab.lib.units import inch
-        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image
         from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
         from reportlab.lib.enums import TA_CENTER, TA_LEFT
     except ImportError:
@@ -402,8 +402,9 @@ def generar_reporte_pdf(df: pd.DataFrame,
         from reportlab.lib.pagesizes import letter
         from reportlab.lib import colors
         from reportlab.lib.units import inch
-        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
-        from reportlab.lib.styles import getSampleStyleSheet
+        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        from reportlab.lib.enums import TA_CENTER, TA_LEFT
     
     # Crear documento
     doc = SimpleDocTemplate(output_path, pagesize=letter)
@@ -435,11 +436,17 @@ def generar_reporte_pdf(df: pd.DataFrame,
     # 1. Matriz de correlación
     elements.append(Paragraph("1. Matriz de Correlación", styles['Heading2']))
     correlacion = generar_matriz_correlacion(df)
-    
+
     # Guardar imagen de correlación
     fig = graficar_mapa_calor(correlacion, guardar=True)
-    elements.append(Spacer(1, 10))
-    
+    correlacion_img_path = 'reports/mapa_calor_correlacion.png'
+    if os.path.exists(correlacion_img_path):
+        elements.append(Image(correlacion_img_path, width=6.5 * inch, height=6.5 * inch))
+        elements.append(Spacer(1, 20))
+    else:
+        elements.append(Paragraph("No se pudo incluir la imagen de correlación porque no se generó correctamente.", styles['Normal']))
+        elements.append(Spacer(1, 10))
+
     # 2. Clasificación de riesgo
     from src.patterns import clasificar_todos_activos
     elements.append(Paragraph("2. Clasificación de Riesgo", styles['Heading2']))
@@ -466,17 +473,24 @@ def generar_reporte_pdf(df: pd.DataFrame,
     
     # 3. Gráficos candlestick de ejemplo
     elements.append(Paragraph("3. Gráficos Candlestick (Top 5 por volatilidad)", styles['Heading2']))
-    elements.append(Paragraph("Los gráficos se encuentran en la carpeta reports/", styles['Normal']))
-    
+    elements.append(Paragraph("Las imágenes de candlestick se incluyen directamente en el PDF.", styles['Normal']))
+    elements.append(Spacer(1, 10))
+
     # Generar candlesticks para top 5
     top5 = reporte_riesgo.head(5)['Ticker'].tolist()
     for ticker in top5:
+        img_path = f'reports/candlestick_{ticker}.png'
         graficar_candlestick(df, ticker, guardar=True)
-    
-    # Construir PDF
+        if os.path.exists(img_path):
+            elements.append(Paragraph(f"Candlestick - {ticker}", styles['Heading3']))
+            elements.append(Image(img_path, width=6.5 * inch, height=4 * inch))
+            elements.append(Spacer(1, 15))
+        else:
+            elements.append(Paragraph(f"No se encontró imagen de candlestick para {ticker}.", styles['Normal']))
+            elements.append(Spacer(1, 10))
     doc.build(elements)
     
-    print(f"✅ Reporte PDF guardado en: {output_path}")
+    print(f"Reporte PDF guardado en: {output_path}")
     return output_path
 
 
