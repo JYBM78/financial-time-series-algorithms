@@ -3,7 +3,7 @@
 Genera una tabla CSV con tiempos medios por algoritmo y tamaño, y guarda gráficos
 de barras ascendentes para el mayor tamaño probado.
 """
-from src.algorithms.sorting import ALGORITHMS
+from src.requerimiento_1.ordenamiento.ordenamiento import ALGORITHMS
 import os
 import sys
 import time

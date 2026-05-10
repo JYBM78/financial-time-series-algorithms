@@ -9,11 +9,13 @@ import streamlit as st
 PROJECT_ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
-from src.requerimiento_1.descarga import descargar_todos
-from src.requerimiento_1.unificacion import unificar
-from src.similarity import comparar_activos
-from src.patterns import analizar_activo, clasificar_todos_activos
-from src.visualization import generar_matriz_correlacion, graficar_mapa_calor, graficar_candlestick, generar_reporte_pdf
+from src.requerimiento_1.etl.descarga import descargar_todos
+from src.requerimiento_1.etl.unificacion import unificar
+from src.requerimiento_2.algoritmos_similitud.similitud import comparar_activos
+from src.requerimiento_3.deteccion_patrones.patrones import analizar_activo, clasificar_todos_activos
+from src.requerimiento_4.mapa_calor.correlacion import generar_matriz_correlacion, graficar_mapa_calor
+from src.requerimiento_4.graficos_velas.candlestick import graficar_candlestick
+from src.requerimiento_4.reporte_pdf.generador import generar_reporte_pdf
 
 
 @st.cache_data

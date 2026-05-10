@@ -12,7 +12,7 @@ import sys
 project_root = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(project_root))
 
-from src.patterns import (
+from src.requerimiento_3.deteccion_patrones.patrones import (
     detectar_todos_patrones,
     calcular_metricas_dispersion,
     clasificar_riesgo,

@@ -24,7 +24,7 @@ if PROJECT_ROOT not in sys.path:
 import pandas as pd
 import numpy as np
 
-from src.similarity import (
+from src.requerimiento_2.algoritmos_similitud.similitud import (
     euclidean_distance,
     euclidean_distance_normalized,
     euclidean_similarity_score,

@@ -12,11 +12,15 @@ import sys
 project_root = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(project_root))
 
-from src.visualization import (
+from src.requerimiento_4.mapa_calor.correlacion import (
     generar_matriz_correlacion,
     graficar_mapa_calor,
+)
+from src.requerimiento_4.graficos_velas.candlestick import (
     graficar_candlestick,
     calcular_media_movil,
+)
+from src.requerimiento_4.reporte_pdf.generador import (
     generar_todas_visualizaciones,
     generar_reporte_pdf
 )
