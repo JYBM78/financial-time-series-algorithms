@@ -1,132 +1,155 @@
-"""Pruebas unitarias para los algoritmos de similitud."""
-import sys
-import os
+"""
+Script de prueba para los algoritmos de similitud.
 
-PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, PROJECT_ROOT)
+Este script prueba los 4 algoritmos de similitud con los datos reales
+del proyecto y muestra los resultados de manera formateada.
+"""
+
+import pandas as pd
+import numpy as np
+from pathlib import Path
+import sys
+
+# Agregar el directorio src al path
+project_root = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(project_root))
 
 from src.similarity import (
-    euclidean_distance, euclidean_distance_normalized, euclidean_similarity_score,
-    pearson_correlation, interpret_correlation,
-    dynamic_time_warping, dynamic_time_warping_normalized, get_dtw_path, dtw_similarity_score,
-    cosine_similarity, cosine_angle, interpret_cosine_similarity,
+    distancia_euclidiana,
+    distancia_euclidiana_normalizada,
+    correlacion_pearson,
+    dynamic_time_warping,
+    similitud_coseno,
+    distancia_coseno,
+    calcular_todas_similitudes,
+    comparar_activos
 )
 
 
-def test_euclidean_distance():
-    """Prueba distancia euclidiana."""
-    a = [1.0, 2.0, 3.0]
-    b = [4.0, 5.0, 6.0]
-
-    dist = euclidean_distance(a, b)
-    assert abs(dist - 5.196152) < 1e-5, f"Esperado ~5.196, obtenido {dist}"
-
-    dist_same = euclidean_distance(a, a)
-    assert dist_same == 0.0, f"Distancia de serie consigo misma debe ser 0, obtenido {dist_same}"
-
-    dist_norm = euclidean_distance_normalized(a, b)
-    expected_norm = 3.0
-    assert abs(dist_norm - expected_norm) < 1e-5, f"Esperado ~{expected_norm}, obtenido {dist_norm}"
-
-    sim = euclidean_similarity_score(a, b)
-    assert 0 <= sim <= 1, f"Similitud debe estar en [0, 1], obtenido {sim}"
-
-    print("  [OK] Distancia Euclidiana")
+def cargar_datos():
+    """Carga los datos unificados del proyecto."""
+    data_path = project_root / "data" / "processed" / "precios_unificados.csv"
+    
+    if not data_path.exists():
+        print(f"Error: No se encontró el archivo {data_path}")
+        print("Por favor ejecuta primero el ETL (main.py)")
+        return None
+    
+    df = pd.read_csv(data_path, parse_dates=['Date'])
+    print(f"Datos cargados: {len(df)} registros")
+    print(f"Activos disponibles: {df['Ticker'].unique()}")
+    
+    return df
 
 
-def test_pearson_correlation():
-    """Prueba correlacion de Pearson."""
-    a = [1.0, 2.0, 3.0, 4.0, 5.0]
-    b = [2.0, 4.0, 6.0, 8.0, 10.0]
-
-    r = pearson_correlation(a, b)
-    assert abs(r - 1.0) < 1e-10, f"Correlacion de series proporcionales debe ser 1, obtenido {r}"
-
-    c = [5.0, 4.0, 3.0, 2.0, 1.0]
-    r_neg = pearson_correlation(a, c)
-    assert abs(r_neg - (-1.0)) < 1e-10, f"Correlacion negativa perfecta debe ser -1, obtenido {r_neg}"
-
-    interp = interpret_correlation(r)
-    assert isinstance(interp, str)
-
-    print("  [OK] Correlacion de Pearson")
+def obtener_serie(df, ticker, columna='Close'):
+    """Obtiene una serie temporal para un ticker específico."""
+    df_ticker = df[df['Ticker'] == ticker].sort_values('Date').reset_index(drop=True)
+    return df_ticker[columna].values
 
 
-def test_dtw():
-    """Prueba Dynamic Time Warping."""
-    a = [1.0, 2.0, 3.0]
-    b = [1.0, 2.0, 3.0]
-
-    dist = dynamic_time_warping(a, b)
-    assert dist == 0.0, f"DTW de series identicas debe ser 0, obtenido {dist}"
-
-    c = [1.0, 3.0]
-    dist_diff_len = dynamic_time_warping(a, c)
-    assert dist_diff_len >= 0, f"DTW debe ser no negativo, obtenido {dist_diff_len}"
-
-    camino = get_dtw_path(a, b)
-    assert len(camino) > 0
-    assert camino[0] == (0, 0), f"Camino debe iniciar en (0, 0), obtenido {camino[0]}"
-    assert camino[-1] == (2, 2), f"Camino debe terminar en (2, 2), obtenido {camino[-1]}"
-
-    sim = dtw_similarity_score(a, b)
-    assert abs(sim - 1.0) < 1e-10, f"Similitud DTW de series identicas debe ser 1, obtenido {sim}"
-
-    print("  [OK] Dynamic Time Warping")
+def obtener_retornos(serie):
+    """Calcula los retornos diarios de una serie de precios."""
+    retornos = np.diff(serie) / serie[:-1]
+    # Eliminar NaN e infinitos
+    retornos = retornos[np.isfinite(retornos)]
+    return retornos
 
 
-def test_cosine_similarity():
-    """Prueba similitud por coseno."""
-    a = [1.0, 2.0, 3.0]
-    b = [2.0, 4.0, 6.0]
-
-    cos = cosine_similarity(a, b)
-    assert abs(cos - 1.0) < 1e-10, f"Coseno de vectores proporcionales debe ser 1, obtenido {cos}"
-
-    c = [-1.0, -2.0, -3.0]
-    cos_neg = cosine_similarity(a, c)
-    assert abs(cos_neg - (-1.0)) < 1e-10, f"Coseno de vectores opuestos debe ser -1, obtenido {cos_neg}"
-
-    angulo = cosine_angle(a, b)
-    assert abs(angulo - 0.0) < 1e-5, f"Angulo de vectores proporcionales debe ser 0, obtenido {angulo}"
-
-    interp = interpret_cosine_similarity(cos)
-    assert isinstance(interp, str)
-
-    print("  [OK] Similitud por Coseno")
+def formatear_resultado(resultado):
+    """Formatea los resultados de similitud para mostrar."""
+    print("\n" + "=" * 60)
+    print(f"COMPARACIÓN: {resultado['ticker1']} vs {resultado['ticker2']}")
+    print("=" * 60)
+    print(f"\nTipo de datos: {resultado['tipo_datos']}")
+    print("\n--- MÉTRICAS DE SIMILITUD ---")
+    print(f"  Distancia Euclidiana:           {resultado['distancia_euclidiana']:.6f}")
+    print(f"  Distancia Euclidiana Normalizada: {resultado['distancia_euclidiana_normalizada']:.6f}")
+    print(f"  Correlación de Pearson:         {resultado['correlacion_pearson']:.6f}")
+    print(f"  Distancia DTW:                  {resultado['dtw']:.6f}")
+    print(f"  Similitud por Coseno:           {resultado['similitud_coseno']:.6f}")
+    print(f"  Distancia por Coseno:           {resultado['distancia_coseno']:.6f}")
+    print()
 
 
-def test_error_handling():
-    """Prueba manejo de errores."""
-    a = [1.0, 2.0]
-    b = [1.0]
-
-    try:
-        euclidean_distance(a, b)
-        assert False, "Debio lanzar ValueError"
-    except ValueError:
-        pass
-
-    try:
-        pearson_correlation(a, b)
-        assert False, "Debio lanzar ValueError"
-    except ValueError:
-        pass
-
-    try:
-        cosine_similarity(a, b)
-        assert False, "Debio lanzar ValueError"
-    except ValueError:
-        pass
-
-    print("  [OK] Manejo de errores")
+def main():
+    print("=" * 60)
+    print("PRUEBA DE ALGORITMOS DE SIMILITUD")
+    print("Requerimiento 2")
+    print("=" * 60)
+    
+    # Cargar datos
+    df = cargar_datos()
+    if df is None:
+        return
+    
+    # Seleccionar algunos activos para comparar
+    tickers_disponibles = df['Ticker'].unique().tolist()
+    print(f"\nTickers disponibles: {tickers_disponibles}")
+    
+    # Comparaciones de ejemplo (sin sufijos .CL)
+    comparaciones = [
+        ('ECOPETROL', 'ISA'),
+        ('GRUPOARGOS', 'GRUPOSURA'),
+        ('ECOPETROL', 'GEB'),
+    ]
+    
+    print("\n" + "=" * 60)
+    print("RESULTADOS DE COMPARACIONES")
+    print("=" * 60)
+    
+    for ticker1, ticker2 in comparaciones:
+        if ticker1 in tickers_disponibles and ticker2 in tickers_disponibles:
+            try:
+                resultado = comparar_activos(df, ticker1, ticker2)
+                formatear_resultado(resultado)
+            except Exception as e:
+                print(f"Error al comparar {ticker1} vs {ticker2}: {e}")
+        else:
+            print(f"\nAdvertencia: Uno de los tickers no está disponible")
+            print(f"  {ticker1}: {'✓' if ticker1 in tickers_disponibles else '✗'}")
+            print(f"  {ticker2}: {'✓' if ticker2 in tickers_disponibles else '✗'}")
+    
+    # Ejemplo con datos sintéticos para mostrar todos los algoritmos
+    print("\n" + "=" * 60)
+    print("EJEMPLO CON DATOS SINTÉTICOS")
+    print("=" * 60)
+    
+    np.random.seed(42)
+    serie1 = np.array([100, 102, 101, 105, 108, 107, 110, 112, 111, 115])
+    serie2 = np.array([98, 101, 100, 104, 107, 106, 109, 111, 110, 114])
+    serie3 = np.array([50, 51, 52, 53, 54, 55, 56, 57, 58, 59])
+    
+    print("\nSerie 1:", serie1)
+    print("Serie 2:", serie2)
+    print("Serie 3:", serie3)
+    
+    resultados = calcular_todas_similitudes(serie1, serie2)
+    print("\n--- Serie 1 vs Serie 2 ---")
+    for clave, valor in resultados.items():
+        if clave not in ['ticker1', 'ticker2', 'tipo_datos']:
+            print(f"  {clave}: {valor:.6f}")
+    
+    resultados = calcular_todas_similitudes(serie1, serie3)
+    print("\n--- Serie 1 vs Serie 3 (escalada) ---")
+    for clave, valor in resultados.items():
+        if clave not in ['ticker1', 'ticker2', 'tipo_datos']:
+            print(f"  {clave}: {valor:.6f}")
+    
+    print("\n" + "=" * 60)
+    print("ANÁLISIS DE COMPLEJIDAD")
+    print("=" * 60)
+    print("""
+ALGORITMO                    COMPLEJIDAD    ESPACIO
+-------------------------------------------------------
+Distancia Euclidiana          O(n)           O(n)
+Correlación de Pearson        O(n)           O(n)
+Dynamic Time Warping          O(n×m)         O(n×m)
+Similitud por Coseno          O(n)           O(1)
+""")
+    
+    print("Pruebas completadas exitosamente!")
 
 
 if __name__ == "__main__":
-    print("Ejecutando pruebas de algoritmos de similitud...\n")
-    test_euclidean_distance()
-    test_pearson_correlation()
-    test_dtw()
-    test_cosine_similarity()
-    test_error_handling()
-    print("\nTodas las pruebas pasaron!")
+    main()

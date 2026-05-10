@@ -39,6 +39,9 @@ Activar entorno virtual:
 Instalar dependencias: 
   pip install -r requirements.txt
 
+Ejecutar interfaz gráfica:
+  streamlit run app.py
+
 Flujo de trabajo en equipo
 
 No trabajar directamente sobre master. Crear siempre una rama nueva y Despues de trabajar:
