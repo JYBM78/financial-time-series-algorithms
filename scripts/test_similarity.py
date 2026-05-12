@@ -14,7 +14,7 @@ import sys
 project_root = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(project_root))
 
-from src.similarity import (
+from src.requerimiento_2.algoritmos_similitud.similitud import (
     distancia_euclidiana,
     distancia_euclidiana_normalizada,
     correlacion_pearson,
