@@ -18,7 +18,6 @@ from src.requerimiento_4.graficos_velas.candlestick import graficar_candlestick
 from src.requerimiento_4.reporte_pdf.generador import generar_reporte_pdf
 
 
-@st.cache_data
 def cargar_dataset() -> pd.DataFrame | None:
     ruta = PROJECT_ROOT / "data" / "processed" / "precios_unificados.csv"
     if ruta.exists():
