@@ -1,0 +1,3 @@
+# Este archivo puede ser necesario para Streamlit Cloud
+# si requiere dependencias del sistema adicionales
+# Actualmente no se necesitan para esta aplicación
