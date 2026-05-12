@@ -53,14 +53,14 @@ El proyecto respeta estrictamente las restricciones de:
 └────────────────────────────┬────────────────────────────────────────────┘
                              │
         ┌────────────────────┼────────────────────┐
-        │                    │                    │
-        ▼                    ▼                    ▼
-   ┌─────────────┐   ┌─────────────┐   ┌──────────────┐
-   │ Modulo ETL  │   │ Similitud   │   │  Patrones &  │
-   │             │   │ & Análisis  │   │  Volatilidad │
-   │ Req 1       │   │             │   │              │
-   │             │   │ Req 2       │   │ Req 3        │
-   └─────────────┘   └─────────────┘   └──────────────┘
+        │                    │                    │                    │
+        ▼                    ▼                    ▼                    ▼
+   ┌─────────────┐   ┌─────────────┐   ┌──────────────┐   ┌────────────┐
+   │ Modulo ETL  │   │ Similitud   │   │  Patrones &  │   │ Visualización │
+   │             │   │ & Análisis  │   │  Volatilidad │   │              │
+   │ Req 1       │   │             │   │              │   │ Req 4        │
+   │             │   │ Req 2       │   │ Req 3        │   │              │
+   └─────────────┘   └─────────────┘   └──────────────┘   └────────────┘
         │
         ▼
    ┌──────────────────────────────────┐
@@ -95,15 +95,21 @@ src/
 │
 ├── requerimiento_3/               # Análisis de Patrones
 │   ├── deteccion_patrones/        # Ventanas deslizantes
+│   │   └── patrones.py            # Detección de patrones en precios
 │   └── metricas_volatilidad/      # Clasificación de riesgo
+│       └── volatilidad.py         # Cálculo de métricas de dispersión y riesgo
 │
 ├── requerimiento_4/               # Visualización
 │   ├── mapa_calor/                # Matriz de correlación
+│   │   └── correlacion.py         # Generación de heatmap de correlación
 │   ├── graficos_velas/            # Candlestick charts
+│   │   └── candlestick.py         # Gráficos de velas y medias móviles
 │   └── reporte_pdf/               # Generación de reportes
+│       └── generador.py          # Ensamblado y exportación de PDF
 │
 └── requerimiento_5/               # Despliegue
-    └── app_web.py                 # Aplicación web (Flask/Streamlit)
+    ├── app_web.py                 # Aplicación web (Flask/Streamlit)
+    └── config.py                  # Configuración de la aplicación web
 ```
 
 ### 2.3 Flujo de Datos en la Aplicación
@@ -404,7 +410,33 @@ Los datos del mercado real contienen:
 - **Outliers extremos:** Errores de tipeo en precios
 - **Discontinuidades temporales:** Calendarios bursátiles diferentes
 
-### 5.2 Algoritmo 1: Eliminación de Duplicados
+### 5.2 Datos Nulos y Discontinuidades Temporales
+
+Los valores nulos (`NaN`) aparecen en series financieras cuando:
+
+- el activo no cotiza en un día específico,
+- la fuente no reporta un valor para algún campo OHLCV,
+- existen días festivos o jornadas de negociación distintas entre bolsas.
+
+**Tratamiento de datos nulos:**
+
+- Se utiliza interpolación lineal para valores numéricos cuando la brecha es pequeña.
+- Se evita interpolar sobre discontinuidades largas asociadas a diferencias de calendario.
+- Se conserva la secuencia temporal de la serie sin forzar un calendario común completo.
+
+**Discontinuidades temporales:**
+
+- Las bolsas de Colombia y los mercados globales no operan los mismos días.
+- El pipeline unifica los datos en formato largo, manteniendo fechas válidas por activo.
+- En el análisis comparativo, las series se alinean por fechas comunes y se recortan al rango válido de ambos activos.
+
+**Justificación algorítmica:**
+
+- Interpolar valores nulos garantiza continuidad local en la serie y evita rupturas que afectarían métricas de similitud.
+- No rellenar gaps extensos reduce el riesgo de introducir datos artificiales que distorsionen patrones.
+- Mantener la información de discontinuidades preserva la realidad del calendario bursátil e incrementa la validez del análisis.
+
+### 5.3 Algoritmo 1: Eliminación de Duplicados
 
 **Problema:** ¿Qué hacer si existe más de un registro para la misma fecha?
 
@@ -430,7 +462,7 @@ def eliminar_duplicados(df):
   - Max: Podría ser outlier
 - **Impacto:** Reduce ruido y mantiene integridad de datos
 
-### 5.3 Algoritmo 2: Interpolación Linear para Valores Faltantes
+### 5.4 Algoritmo 2: Interpolación Linear para Valores Faltantes
 
 **Problema:** Series de tiempo financieras requieren continuidad temporal
 
@@ -478,7 +510,7 @@ $$y_m = y_0 + \frac{y_1 - y_0}{t_1 - t_0} \times (t_m - t_0)$$
 # - Interpolar linealmente
 ```
 
-### 5.4 Algoritmo 3: Detección de Outliers (Desviación Estándar)
+### 5.5 Algoritmo 3: Detección de Outliers (Desviación Estándar)
 
 **Problema:** ¿Cuándo un precio es anómalo?
 
@@ -526,7 +558,7 @@ Distribución de precios:
          μ-2.5σ   μ+2.5σ
 ```
 
-### 5.5 Algoritmo 4: Validación de Rango de Precio
+### 5.6 Algoritmo 4: Validación de Rango de Precio
 
 **Problema:** Garantizar coherencia de OHLCV
 
@@ -561,7 +593,7 @@ def validar_rango_precio(df):
 
 **Impacto:** O(n) - Validación en una sola pasada
 
-### 5.6 Pseudocódigo Integrado del Pipeline de Limpieza
+### 5.7 Pseudocódigo Integrado del Pipeline de Limpieza
 
 ```pseudocode
 FUNCIÓN limpiar_dataset(lista_archivos_csv):
