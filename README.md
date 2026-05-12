@@ -48,6 +48,7 @@ streamlit run app.py
 El proyecto está configurado para despliegue fácil en múltiples plataformas cloud. Elige la opción que prefieras:
 
 ### Opción 1: Streamlit Cloud (Más fácil - Recomendado)
+
 1. Ve a [share.streamlit.io](https://share.streamlit.io)
 2. Conecta tu cuenta de GitHub
 3. Selecciona este repositorio
@@ -56,16 +57,20 @@ El proyecto está configurado para despliegue fácil en múltiples plataformas c
 6. **¡Listo!** Tu app estará online en segundos
 
 ### Opción 2: Heroku (Gratuito con límites)
+
 1. Crea cuenta en [heroku.com](https://heroku.com)
 2. Instala Heroku CLI
 3. Desde el directorio del proyecto:
+
 ```bash
 heroku create nombre-tu-app
 git push heroku main
 ```
+
 4. La app estará disponible en `https://nombre-tu-app.herokuapp.com`
 
 ### Opción 3: Railway (Moderna y fácil)
+
 1. Ve a [railway.app](https://railway.app)
 2. Conecta tu repositorio de GitHub
 3. Railway detectará automáticamente que es una app de Streamlit
@@ -73,6 +78,7 @@ git push heroku main
 5. **¡Listo!** URL generada automáticamente
 
 ### Opción 4: Render (Alternativa gratuita)
+
 1. Ve a [render.com](https://render.com)
 2. Conecta tu repositorio de GitHub
 3. Selecciona "Web Service"
@@ -80,7 +86,9 @@ git push heroku main
    - Runtime: Python 3
    - Build Command: `pip install -r requirements.txt`
    - Start Command: `streamlit run app.py --server.port $PORT --server.headless true`
+
 ### Opción 5: Vercel (Rápido y gratuito)
+
 1. Ve a [vercel.com](https://vercel.com)
 2. Conecta tu cuenta de GitHub
 3. Importa este repositorio
@@ -89,6 +97,7 @@ git push heroku main
 6. **¡Listo!** URL generada automáticamente
 
 ### Archivos de configuración incluidos:
+
 - `Procfile` - Para Heroku
 - `runtime.txt` - Versión de Python para Heroku
 - `.slugignore` - Archivos a excluir en Heroku
@@ -99,6 +108,7 @@ git push heroku main
 **Nota:** Todas las opciones mantienen tu código intacto y funcionan sin modificaciones.
 
 **Consideraciones para despliegue:**
+
 - La aplicación descarga datos automáticamente desde Yahoo Finance
 - Los reportes y datos procesados se guardan en el sistema de archivos de la plataforma
 - Para plataformas con límites de almacenamiento, considera usar servicios externos para datos grandes

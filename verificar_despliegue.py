@@ -3,6 +3,7 @@ import os
 import sys
 from pathlib import Path
 
+
 def verificar_estructura():
     """Verifica que la estructura del proyecto sea compatible con despliegue cloud"""
     print("🔍 Verificando compatibilidad con despliegue en la nube...")
@@ -21,7 +22,8 @@ def verificar_estructura():
         if Path(directorio).exists():
             print(f"✅ Directorio {directorio}/ existe")
         else:
-            print(f"⚠️  Directorio {directorio}/ no existe (se creará automáticamente)")
+            print(
+                f"⚠️  Directorio {directorio}/ no existe (se creará automáticamente)")
 
     # Verificar imports
     try:
@@ -43,6 +45,7 @@ def verificar_estructura():
     print("1. Streamlit Cloud (más fácil): https://share.streamlit.io")
     print("2. Railway: https://railway.app")
     print("3. Render: https://render.com")
+
 
 if __name__ == "__main__":
     verificar_estructura()
