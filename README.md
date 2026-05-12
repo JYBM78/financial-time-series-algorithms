@@ -43,6 +43,24 @@ pip install -r requirements.txt
 Ejecutar interfaz gráfica:
 streamlit run app.py
 
+## 🚀 Despliegue Actual
+
+**✅ Aplicación desplegada y funcional en Streamlit Cloud**
+
+- **URL de producción**: https://financial-time.streamlit.app/
+- **Plataforma**: Streamlit Cloud
+- **Estado**: ✅ Activo y funcionando
+- **Última actualización**: May 12, 2026
+- **Repositorio**: `jybm78/financial-time-series-algorithms` (rama `yovany`)
+
+### Características del despliegue:
+
+- ✅ Aplicación web interactiva 24/7
+- ✅ Acceso público desde cualquier dispositivo
+- ✅ Actualizaciones automáticas desde GitHub
+- ✅ Sin costos para uso básico
+- ✅ Cumple Requerimiento 5 del curso
+
 ## 🚀 Despliegue en la Nube
 
 El proyecto está configurado para despliegue fácil en múltiples plataformas cloud. Elige la opción que prefieras:
