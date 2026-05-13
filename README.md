@@ -43,6 +43,95 @@ pip install -r requirements.txt
 Ejecutar interfaz gráfica:
 streamlit run app.py
 
+## 🚀 Despliegue Actual
+
+**✅ Aplicación desplegada y funcional en Streamlit Cloud**
+
+- **URL de producción**: https://financial-time.streamlit.app/
+- **Plataforma**: Streamlit Cloud
+- **Estado**: ✅ Activo y funcionando
+- **Última actualización**: May 12, 2026
+- **Repositorio**: `jybm78/financial-time-series-algorithms` (rama `yovany`)
+
+### Características del despliegue:
+
+- ✅ Aplicación web interactiva 24/7
+- ✅ Acceso público desde cualquier dispositivo
+- ✅ Actualizaciones automáticas desde GitHub
+- ✅ Sin costos para uso básico
+- ✅ Cumple Requerimiento 5 del curso
+
+## 🚀 Despliegue en la Nube
+
+El proyecto está configurado para despliegue fácil en múltiples plataformas cloud. Elige la opción que prefieras:
+
+### Opción 1: Streamlit Cloud (Más fácil - Recomendado)
+
+1. Ve a [share.streamlit.io](https://share.streamlit.io)
+2. Conecta tu cuenta de GitHub
+3. Selecciona este repositorio
+4. Elige `app.py` como archivo principal
+5. Haz clic en "Deploy"
+6. **¡Listo!** Tu app estará online en segundos
+
+### Opción 2: Heroku (Gratuito con límites)
+
+1. Crea cuenta en [heroku.com](https://heroku.com)
+2. Instala Heroku CLI
+3. Desde el directorio del proyecto:
+
+```bash
+heroku create nombre-tu-app
+git push heroku main
+```
+
+4. La app estará disponible en `https://nombre-tu-app.herokuapp.com`
+
+### Opción 3: Railway (Moderna y fácil)
+
+1. Ve a [railway.app](https://railway.app)
+2. Conecta tu repositorio de GitHub
+3. Railway detectará automáticamente que es una app de Streamlit
+4. Haz clic en "Deploy"
+5. **¡Listo!** URL generada automáticamente
+
+### Opción 4: Render (Alternativa gratuita)
+
+1. Ve a [render.com](https://render.com)
+2. Conecta tu repositorio de GitHub
+3. Selecciona "Web Service"
+4. Configura:
+   - Runtime: Python 3
+   - Build Command: `pip install -r requirements.txt`
+   - Start Command: `streamlit run app.py --server.port $PORT --server.headless true`
+
+### Opción 5: Vercel (Rápido y gratuito)
+
+1. Ve a [vercel.com](https://vercel.com)
+2. Conecta tu cuenta de GitHub
+3. Importa este repositorio
+4. Vercel detectará automáticamente la configuración
+5. Haz clic en "Deploy"
+6. **¡Listo!** URL generada automáticamente
+
+### Archivos de configuración incluidos:
+
+- `Procfile` - Para Heroku
+- `runtime.txt` - Versión de Python para Heroku
+- `.slugignore` - Archivos a excluir en Heroku
+- `setup.sh` - Configuración para Railway
+- `render.yaml` - Configuración para Render
+- `vercel.json` - Configuración para Vercel
+
+**Nota:** Todas las opciones mantienen tu código intacto y funcionan sin modificaciones.
+
+**Consideraciones para despliegue:**
+
+- La aplicación descarga datos automáticamente desde Yahoo Finance
+- Los reportes y datos procesados se guardan en el sistema de archivos de la plataforma
+- Para plataformas con límites de almacenamiento, considera usar servicios externos para datos grandes
+- Todas las plataformas soportan las dependencias en `requirements.txt`
+
 Flujo de trabajo en equipo
 
 No trabajar directamente sobre master. Crear siempre una rama nueva y Despues de trabajar:
